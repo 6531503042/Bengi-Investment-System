@@ -11,7 +11,12 @@
 
 *Inspired by [Webull](https://www.webull.com/) & [Dime](https://dime.co.th/) — Built for Performance & Simplicity*
 
+---
+
+**🌐 Language / ภาษา:** [![EN](https://img.shields.io/badge/English-blue?style=flat-square)](README.md) [![TH](https://img.shields.io/badge/ไทย-green?style=flat-square)](README.th.md)
+
 </div>
+
 
 ---
 
