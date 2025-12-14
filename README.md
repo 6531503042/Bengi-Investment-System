@@ -298,7 +298,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-**Built with ❤️ by [@bricksocoolxd](https://github.com/bricksocoolxd)**
+**Built with ❤️ by [@Bengi](https://github.com/6531503042)**
 
 ⭐ Star this repo if you find it useful!
 
