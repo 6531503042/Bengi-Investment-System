@@ -123,14 +123,15 @@ bengi-investment-system/
 |------------|---------|
 | **Go 1.21+** | Primary language — fast, typed, concurrent |
 | **Go Fiber v2** | Web framework — Express-like, high performance |
+| **WebSocket** | Real-time communication — live price feeds |
 | **MongoDB** | Database — flexible schema, horizontal scaling |
-| **Redis** | Caching — session, rate limiting, real-time data |
+| **Redis** | Caching + Pub/Sub — session, real-time broadcast |
 | **Apache Kafka** | Event streaming — order events, price feeds |
 
 ### External APIs
 | Service | Purpose |
 |---------|---------|
-| **Twelve Data** | Real-time & historical market data |
+| **Twelve Data** | Real-time & historical market data (WebSocket API) |
 
 ### DevOps (Planned)
 | Technology | Purpose |
@@ -143,6 +144,7 @@ bengi-investment-system/
 
 ## 🔄 Data Flow
 
+### REST API Flow
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │   Client    │────▶│   Fiber     │────▶│  Service    │
@@ -156,6 +158,26 @@ bengi-investment-system/
              │   MongoDB   │           │    Redis    │           │    Kafka    │
              │  (Primary)  │           │   (Cache)   │           │  (Events)   │
              └─────────────┘           └─────────────┘           └─────────────┘
+```
+
+### Real-time WebSocket Flow
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│ Twelve Data │─────▶│ Price Sync  │─────▶│    Redis    │
+│  WebSocket  │      │  Service    │      │   Pub/Sub   │
+└─────────────┘      └──────┬──────┘      └──────┬──────┘
+                            │                    │
+                            ▼                    ▼
+                     ┌─────────────┐      ┌─────────────┐
+                     │    Kafka    │─────▶│   Fiber     │
+                     │(Price Topic)│      │  WebSocket  │
+                     └─────────────┘      └──────┬──────┘
+                                                 │
+                                                 ▼
+                                          ┌─────────────┐
+                                          │   Clients   │
+                                          │ (Real-time) │
+                                          └─────────────┘
 ```
 
 ---
