@@ -13,9 +13,10 @@ import (
 )
 
 var (
-	ErrEmailExists        = errors.New("email already exists")
-	ErrInvalidCredentials = errors.New("invalid credentials")
-	ErrUserNotFound       = errors.New("user not found")
+	ErrEmailExists         = errors.New("email already exists")
+	ErrInvalidCredentials  = errors.New("invalid credentials")
+	ErrUserNotFound        = errors.New("user not found")
+	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 )
 
 type AuthService struct {
@@ -73,14 +74,19 @@ func (s *AuthService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 	// Update last login
 	_ = s.UserRepository.UpdateLastLogin(ctx, user.ID)
 
-	// Generate token
-	token, err := utils.GenerateToken(user.ID.Hex(), user.Email, user.RoleID.Hex())
+	accessToken, err := utils.GenerateToken(user.ID.Hex(), user.Email, user.RoleID.Hex())
+	if err != nil {
+		return nil, err
+	}
+
+	refreshToken, err := utils.GenerateRefreshToken(user.ID.Hex())
 	if err != nil {
 		return nil, err
 	}
 
 	return &dto.LoginResponse{
-		Token: token,
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
 		User: dto.UserProfile{
 			ID:       user.ID.Hex(),
 			Email:    user.Email,
@@ -100,5 +106,43 @@ func (s *AuthService) GetProfile(ctx context.Context, userID string) (*dto.UserP
 		Email:    user.Email,
 		FullName: user.FullName,
 		RoleID:   user.RoleID.Hex(),
+	}, nil
+}
+
+// RefreshToken validates refresh token and generates new tokens
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*dto.LoginResponse, error) {
+	// Validate refresh token
+	claims, err := utils.ValidateRefreshToken(refreshToken)
+	if err != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+
+	// Get user from database
+	user, err := s.UserRepository.FindById(ctx, claims.UserID)
+	if err != nil {
+		return nil, ErrUserNotFound
+	}
+
+	// Generate new access token
+	newAccessToken, err := utils.GenerateToken(user.ID.Hex(), user.Email, user.RoleID.Hex())
+	if err != nil {
+		return nil, err
+	}
+
+	// Generate new refresh token
+	newRefreshToken, err := utils.GenerateRefreshToken(user.ID.Hex())
+	if err != nil {
+		return nil, err
+	}
+
+	return &dto.LoginResponse{
+		AccessToken:  newAccessToken,
+		RefreshToken: newRefreshToken,
+		User: dto.UserProfile{
+			ID:       user.ID.Hex(),
+			Email:    user.Email,
+			FullName: user.FullName,
+			RoleID:   user.RoleID.Hex(),
+		},
 	}, nil
 }

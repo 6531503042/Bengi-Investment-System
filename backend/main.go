@@ -3,12 +3,19 @@ package main
 import (
 	"log"
 
+	"github.com/bricksocoolxd/bengi-investment-system/module/auth/routes"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/config"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/core/database"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
 )
 
 func main() {
+
+	config.LoadConfig()
+	database.ConnextMongoDB()
+
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
 		AppName: "Bengi Investment System",
@@ -26,14 +33,9 @@ func main() {
 		})
 	})
 
-	// TODO: Register modules here
-	// auth.RegisterRoutes(app)
-	// account.RegisterRoutes(app)
-	// portfolio.RegisterRoutes(app)
-	// order.RegisterRoutes(app)
-	// trade.RegisterRoutes(app)
-	// instrument.RegisterRoutes(app)
+	routes.RegisterRoutes(app)
 
 	// Start server
-	log.Fatal(app.Listen(":3000"))
+	log.Printf("🚀 Server starting on port %s", config.AppConfig.Port)
+	log.Fatal(app.Listen(":" + config.AppConfig.Port))
 }

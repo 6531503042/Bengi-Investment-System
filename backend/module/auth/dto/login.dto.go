@@ -7,8 +7,9 @@ type (
 	}
 
 	LoginResponse struct {
-		Token string      `json:"token"`
-		User  UserProfile `json:"user"`
+		AccessToken  string      `json:"accessToken"`
+		RefreshToken string      `json:"refreshToken"`
+		User         UserProfile `json:"user"`
 	}
 
 	UserProfile struct {
