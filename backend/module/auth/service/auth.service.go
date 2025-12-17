@@ -17,6 +17,7 @@ var (
 	ErrInvalidCredentials  = errors.New("invalid credentials")
 	ErrUserNotFound        = errors.New("user not found")
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
+	ErrWrongPassword       = errors.New("current password is incorrect")
 )
 
 type AuthService struct {
@@ -145,4 +146,27 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*d
 			RoleID:   user.RoleID.Hex(),
 		},
 	}, nil
+}
+
+// ChangePassword changes user password after validating current password
+func (s *AuthService) ChangePassword(ctx context.Context, userID string, req *dto.ChangePasswordRequest) error {
+	// Get user
+	user, err := s.UserRepository.FindById(ctx, userID)
+	if err != nil {
+		return ErrUserNotFound
+	}
+
+	// Verify current password
+	if !utils.CheckPassword(req.CurrentPassword, user.Password) {
+		return ErrWrongPassword
+	}
+
+	// Hash new password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.NewPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	// Update password
+	return s.UserRepository.UpdatePassword(ctx, user.ID, string(hashedPassword))
 }

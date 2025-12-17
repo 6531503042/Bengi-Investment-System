@@ -24,4 +24,5 @@ func RegisterRoutes(app *fiber.App) {
 
 	// Protected routes
 	auth.Get("/profile", middleware.AuthRequired(), ctrl.GetProfile)
+	auth.Put("/password", middleware.AuthRequired(), ctrl.ChangePassword)
 }

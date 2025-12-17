@@ -6,6 +6,7 @@ import (
 	"github.com/bricksocoolxd/bengi-investment-system/module/auth/routes"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/config"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/core/database"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/seeder"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -15,6 +16,9 @@ func main() {
 
 	config.LoadConfig()
 	database.ConnextMongoDB()
+
+	// Run seeders (create default roles, etc.)
+	seeder.RunSeeders()
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{

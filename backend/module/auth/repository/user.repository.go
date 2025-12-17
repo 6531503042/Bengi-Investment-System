@@ -72,3 +72,13 @@ func (r *UserRepository) EmailExists(ctx context.Context, email string) (bool, e
 	}
 	return count > 0, nil
 }
+
+func (r *UserRepository) UpdatePassword(ctx context.Context, id primitive.ObjectID, hashedPassword string) error {
+	_, err := r.collection.UpdateByID(ctx, id, bson.M{
+		"$set": bson.M{
+			"password":  hashedPassword,
+			"updatedAt": time.Now(),
+		},
+	})
+	return err
+}

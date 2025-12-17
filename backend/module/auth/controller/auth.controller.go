@@ -23,8 +23,9 @@ func NewAuthController(authService *service.AuthService) *AuthController {
 
 func (ctrl *AuthController) Register(c *fiber.Ctx) error {
 	var req dto.RegisterRequest
-	if err := c.BodyParser(&req); err != nil {
-		return common.BadRequest(c, "Invalid request body")
+
+	if validationErrors := utils.ParseAndValidate(c, &req); validationErrors != nil {
+		return common.ValidationError(c, validationErrors)
 	}
 
 	result, err := ctrl.authService.Register(c.Context(), &req)
@@ -35,14 +36,16 @@ func (ctrl *AuthController) Register(c *fiber.Ctx) error {
 		return common.InternalError(c, err.Error())
 	}
 
-	return common.Success(c, result, "Register successfully")
+	return common.Created(c, result, "Register successfully")
 }
 
 func (ctrl *AuthController) Login(c *fiber.Ctx) error {
 	var req dto.LoginRequest
-	if err := c.BodyParser(&req); err != nil {
-		return common.BadRequest(c, "Invalid request body")
+
+	if validationErrors := utils.ParseAndValidate(c, &req); validationErrors != nil {
+		return common.ValidationError(c, validationErrors)
 	}
+
 	result, err := ctrl.authService.Login(c.Context(), &req)
 	if err != nil {
 		if errors.Is(err, service.ErrInvalidCredentials) {
@@ -93,4 +96,26 @@ func (ctrl *AuthController) GetProfile(c *fiber.Ctx) error {
 	}
 
 	return common.Success(c, result, "Get profile successfully")
+}
+
+func (ctrl *AuthController) ChangePassword(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return common.Unauthorized(c, "User not authenticated")
+	}
+
+	var req dto.ChangePasswordRequest
+	if validationErrors := utils.ParseAndValidate(c, &req); validationErrors != nil {
+		return common.ValidationError(c, validationErrors)
+	}
+
+	err := ctrl.authService.ChangePassword(c.Context(), userID, &req)
+	if err != nil {
+		if errors.Is(err, service.ErrWrongPassword) {
+			return common.BadRequest(c, "Current password is incorrect")
+		}
+		return common.InternalError(c, err.Error())
+	}
+
+	return common.Success(c, nil, "Password changed successfully")
 }
