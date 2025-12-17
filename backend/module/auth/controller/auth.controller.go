@@ -58,18 +58,18 @@ func (ctrl *AuthController) Login(c *fiber.Ctx) error {
 }
 
 func (ctrl *AuthController) RefreshToken(c *fiber.Ctx) error {
-	// Get refresh token from cookie
+
 	refreshToken := c.Cookies(utils.RefreshTokenCookie)
 	if refreshToken == "" {
 		return common.Unauthorized(c, "Refresh token not found")
 	}
-	// Validate and generate new tokens
+
 	result, err := ctrl.authService.RefreshToken(c.Context(), refreshToken)
 	if err != nil {
 		utils.ClearAuthCookies(c)
 		return common.Unauthorized(c, "Invalid refresh token")
 	}
-	// Set new cookies
+
 	utils.SetAuthCookies(c, result.AccessToken, result.RefreshToken)
 	return common.Success(c, nil, "Token refreshed")
 }

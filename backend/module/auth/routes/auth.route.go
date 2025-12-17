@@ -9,7 +9,7 @@ import (
 )
 
 func RegisterRoutes(app *fiber.App) {
-	// Wire up dependencies: repository → service → controller
+
 	userRepo := repository.NewUserRepository()
 	authService := service.NewAuthService(userRepo)
 	ctrl := controller.NewAuthController(authService)
