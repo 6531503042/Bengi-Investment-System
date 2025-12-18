@@ -113,6 +113,7 @@ func (r *AccountRepository) GetTransactionsByAccountID(ctx context.Context, acco
 		SetSort(bson.D{{Key: "createdAt", Value: -1}}).
 		SetLimit(int64(limit)).
 		SetSkip(int64(offset))
+
 	cursor, err := r.transactionCollection.Find(ctx, bson.M{"accountId": objectID}, opts)
 	if err != nil {
 		return nil, err

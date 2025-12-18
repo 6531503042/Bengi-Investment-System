@@ -9,10 +9,12 @@ type (
 
 	AccountResponse struct {
 		ID        string    `json:"id"`
+		UserID    string    `json:"userId"`
 		Currency  string    `json:"currency"`
 		Balance   float64   `json:"balance"`
 		CreatedAt time.Time `json:"createdAt"`
 		UpdatedAt time.Time `json:"updatedAt"`
+		Status    string    `json:"status"`
 	}
 
 	DepositRequest struct {
