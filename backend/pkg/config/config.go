@@ -18,6 +18,9 @@ type Config struct {
 	MongoURI      string
 	MongoDatabase string
 
+	// TwelveData API
+	TwelveDataAPIKey string
+
 	// JWT
 	JWTSecret         string
 	JWTExpireDuration time.Duration
@@ -36,6 +39,8 @@ func LoadConfig() {
 	AppConfig = &Config{
 		Port: getEnv("PORT", "8080"),
 		Env:  getEnv("ENV", "development"),
+
+		TwelveDataAPIKey: getEnv("TWELVEDATA_API_KEY", ""),
 
 		MongoURI:      getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		MongoDatabase: getEnv("MONGO_DATABASE", "bengi-investment-system"),
