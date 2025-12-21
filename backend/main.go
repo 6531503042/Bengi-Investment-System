@@ -6,6 +6,7 @@ import (
 	accountRoutes "github.com/bricksocoolxd/bengi-investment-system/module/account/routes"
 	authRoutes "github.com/bricksocoolxd/bengi-investment-system/module/auth/routes"
 	instrumentRoutes "github.com/bricksocoolxd/bengi-investment-system/module/instrument/routes"
+	orderRoutes "github.com/bricksocoolxd/bengi-investment-system/module/order/routes"
 	portfolioRoutes "github.com/bricksocoolxd/bengi-investment-system/module/portfolio/routes"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/config"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/core/database"
@@ -45,6 +46,7 @@ func main() {
 	accountRoutes.RegisterRoutes(app)
 	instrumentRoutes.RegisterRoutes(app)
 	portfolioRoutes.RegisterRoutes(app)
+	orderRoutes.RegisterRoutes(app)
 
 	// Start server
 	log.Printf("🚀 Server starting on port %s", config.AppConfig.Port)
