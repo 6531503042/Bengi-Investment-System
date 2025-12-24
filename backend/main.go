@@ -13,6 +13,7 @@ import (
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/config"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/core/database"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/seeder"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/ws"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/logger"
@@ -51,6 +52,9 @@ func main() {
 	orderRoutes.RegisterRoutes(app)
 	tradeRoutes.RegisterRoutes(app)
 	watchlistRoutes.RegisterRoutes(app)
+
+	// WebSocket routes
+	ws.RegisterRoutes(app)
 
 	// Start server
 	log.Printf("🚀 Server starting on port %s", config.AppConfig.Port)

@@ -31,4 +31,19 @@ func Handler(c *websocket.Conn) {
 	Manager.Register(client)
 
 	go client.WritePump()
+	client.ReadPump()
+}
+
+func RegisterRoutes(app *fiber.App) {
+	Initialze()
+
+	app.Get("/ws", UpgradeMiddleware())
+	app.Get("/ws", websocket.New(Handler))
+
+	app.Get("/ws/stats", func(c *fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"clients": Manager.ClientCount(),
+			"topics":  Bus.GetTopics(),
+		})
+	})
 }

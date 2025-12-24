@@ -7,6 +7,7 @@ import (
 	"github.com/bricksocoolxd/bengi-investment-system/module/order/dto"
 	"github.com/bricksocoolxd/bengi-investment-system/module/order/model"
 	"github.com/bricksocoolxd/bengi-investment-system/module/order/repository"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/ws"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -75,6 +76,14 @@ func (s *OrderService) CreateOrder(ctx context.Context, userID string, req *dto.
 	if err := s.repo.Create(ctx, order); err != nil {
 		return nil, err
 	}
+
+	ws.PublishOrderUpdate(userID, &ws.OrderPayload{
+		OrderID:   order.ID.Hex(),
+		Symbol:    order.Symbol,
+		Side:      string(order.Side),
+		Status:    string(order.Status),
+		FilledQty: 0,
+	})
 
 	return s.toOrderResponse(order), nil
 }
@@ -150,6 +159,15 @@ func (s *OrderService) CancelOrder(ctx context.Context, orderID, userID string) 
 	if err := s.repo.UpdateStatus(ctx, order.ID, model.OrderStatusCancelled); err != nil {
 		return nil, err
 	}
+
+	ws.PublishOrderUpdate(userID, &ws.OrderPayload{
+		OrderID:   order.ID.Hex(),
+		Symbol:    order.Symbol,
+		Side:      string(order.Side),
+		Status:    string(model.OrderStatusCancelled),
+		FilledQty: order.FilledQty,
+		AvgPrice:  order.AvgFillPrice,
+	})
 
 	// Fetch updated order
 	updated, err := s.repo.FindByID(ctx, orderID)

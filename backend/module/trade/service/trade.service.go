@@ -14,6 +14,7 @@ import (
 	"github.com/bricksocoolxd/bengi-investment-system/module/trade/dto"
 	tradeModel "github.com/bricksocoolxd/bengi-investment-system/module/trade/model"
 	tradeRepo "github.com/bricksocoolxd/bengi-investment-system/module/trade/repository"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/ws"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -155,6 +156,8 @@ func (s *TradeService) ExecuteTrade(ctx context.Context, req *dto.ExecuteTradeRe
 
 	// 10. Update portfolio position
 	s.updatePosition(ctx, trade, order.Side)
+
+	s.publishTradeEvents(trade, order, newFilledQty, newAvgPrice, newStatus)
 
 	return s.toTradeResponse(trade), nil
 }
@@ -370,4 +373,34 @@ func (s *TradeService) toTradeResponse(trade *tradeModel.Trade) *dto.TradeRespon
 		NetAmount:    trade.NetAmount,
 		ExecutedAt:   trade.ExecutedAt.Format(time.RFC3339),
 	}
+}
+
+// publishTradeEvents publishes WebSocket events for trade execution
+func (s *TradeService) publishTradeEvents(
+	trade *tradeModel.Trade,
+	order *orderModel.Order,
+	filledQty float64,
+	avgPrice float64,
+	status orderModel.OrderStatus,
+) {
+	userID := order.UserID.Hex()
+	// Publish trade executed event
+	ws.PublishTradeUpdate(userID, &ws.TradePayload{
+		TradeID:    trade.ID.Hex(),
+		OrderID:    trade.OrderID.Hex(),
+		Symbol:     trade.Symbol,
+		Side:       string(trade.Side),
+		Quantity:   trade.Quantity,
+		Price:      trade.Price,
+		Commission: trade.Commission,
+	})
+	// Publish order update event
+	ws.PublishOrderUpdate(userID, &ws.OrderPayload{
+		OrderID:   order.ID.Hex(),
+		Symbol:    order.Symbol,
+		Side:      string(order.Side),
+		Status:    string(status),
+		FilledQty: filledQty,
+		AvgPrice:  avgPrice,
+	})
 }
