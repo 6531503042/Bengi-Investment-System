@@ -21,11 +21,11 @@ func NewUserRepository() *UserRepository {
 	}
 }
 
-func (r *UserRepository) CreateUser(ctx context.Context, user model.User) error {
+func (r *UserRepository) CreateUser(ctx context.Context, user *model.User) error {
 	user.CreatedAt = time.Now()
 	user.UpdatedAt = time.Now()
 
-	result, err := r.collection.InsertOne(context.Background(), user)
+	result, err := r.collection.InsertOne(ctx, user)
 	if err != nil {
 		return err
 	}

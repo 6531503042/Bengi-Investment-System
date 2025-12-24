@@ -75,8 +75,39 @@ func (ps *PriceStream) Start() error {
 		log.Println("[PriceStream] No Finnhub API key configured, skipping")
 		return nil
 	}
-	go ps.connectLoop()
+	go ps.safeConnectLoop()
 	return nil
+}
+
+// safeConnectLoop wraps connectLoop with panic recovery
+func (ps *PriceStream) safeConnectLoop() {
+	for {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					log.Printf("[PriceStream] PANIC recovered in connectLoop: %v", r)
+					ps.mu.Lock()
+					ps.isConnected = false
+					if ps.conn != nil {
+						ps.conn.Close()
+						ps.conn = nil
+					}
+					ps.mu.Unlock()
+				}
+			}()
+			ps.connectLoop()
+		}()
+
+		// Check if we should stop
+		select {
+		case <-ps.done:
+			log.Println("[PriceStream] Stopping connection loop")
+			return
+		default:
+			log.Println("[PriceStream] Restarting connection loop after panic...")
+			time.Sleep(5 * time.Second)
+		}
+	}
 }
 
 // Stop stops the price stream
@@ -89,6 +120,12 @@ func (ps *PriceStream) Stop() {
 
 // connectLoop handles connection and reconnection
 func (ps *PriceStream) connectLoop() {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[PriceStream] Recovered from panic in connectLoop: %v", r)
+		}
+	}()
+
 	for {
 		select {
 		case <-ps.done:
@@ -96,7 +133,10 @@ func (ps *PriceStream) connectLoop() {
 		default:
 			if err := ps.connect(); err != nil {
 				log.Printf("[PriceStream] Connection error: %v", err)
+				ps.mu.Lock()
 				ps.isConnected = false
+				ps.conn = nil
+				ps.mu.Unlock()
 
 				// Exponential backoff
 				time.Sleep(ps.reconnectDelay)
@@ -109,10 +149,21 @@ func (ps *PriceStream) connectLoop() {
 
 			// Reset reconnect delay on successful connect
 			ps.reconnectDelay = time.Second
+			ps.mu.Lock()
 			ps.isConnected = true
+			ps.mu.Unlock()
 
-			// Read messages
+			// Read messages (blocks until error)
 			ps.readLoop()
+
+			// If we get here, readLoop exited (connection lost)
+			ps.mu.Lock()
+			ps.isConnected = false
+			ps.conn = nil
+			ps.mu.Unlock()
+
+			log.Println("[PriceStream] Connection lost, will reconnect...")
+			time.Sleep(time.Second)
 		}
 	}
 }
@@ -147,6 +198,9 @@ func (ps *PriceStream) connect() error {
 // readLoop reads messages from Finnhub
 func (ps *PriceStream) readLoop() {
 	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[PriceStream] Recovered from panic: %v", r)
+		}
 		if ps.conn != nil {
 			ps.conn.Close()
 		}
@@ -157,6 +211,11 @@ func (ps *PriceStream) readLoop() {
 		case <-ps.done:
 			return
 		default:
+			if ps.conn == nil {
+				log.Printf("[PriceStream] Connection is nil, exiting readLoop")
+				return
+			}
+
 			_, message, err := ps.conn.ReadMessage()
 			if err != nil {
 				log.Printf("[PriceStream] Read error: %v", err)

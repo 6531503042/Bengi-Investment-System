@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bengi Investment - WebSocket Price Test</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container { max-width: 800px; margin: 0 auto; }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 20px; 
+            background: linear-gradient(90deg, #00d4ff, #00ff88);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .status { 
+            padding: 15px; 
+            border-radius: 10px; 
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: bold;
+        }
+        .status.connected { background: rgba(0, 255, 136, 0.2); border: 1px solid #00ff88; }
+        .status.disconnected { background: rgba(255, 0, 0, 0.2); border: 1px solid #ff4444; }
+        .status.connecting { background: rgba(255, 200, 0, 0.2); border: 1px solid #ffc800; }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        input, button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+        input {
+            flex: 1;
+            min-width: 200px;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+        }
+        button {
+            background: linear-gradient(135deg, #00d4ff, #00ff88);
+            color: #000;
+            cursor: pointer;
+            font-weight: bold;
+            transition: transform 0.2s;
+        }
+        button:hover { transform: scale(1.05); }
+        button.disconnect { background: linear-gradient(135deg, #ff4444, #ff8844); }
+        .prices {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .price-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .price-card .symbol { font-size: 24px; font-weight: bold; color: #00d4ff; }
+        .price-card .price { font-size: 32px; font-weight: bold; margin: 10px 0; }
+        .price-card .change { font-size: 14px; }
+        .price-card .change.positive { color: #00ff88; }
+        .price-card .change.negative { color: #ff4444; }
+        .log {
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 15px;
+            height: 300px;
+            overflow-y: auto;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+        }
+        .log-entry { 
+            padding: 5px 0; 
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+        .log-entry .time { color: #888; margin-right: 10px; }
+        .log-entry .type { 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            font-size: 10px;
+            margin-right: 10px;
+        }
+        .log-entry .type.send { background: #00d4ff; color: #000; }
+        .log-entry .type.receive { background: #00ff88; color: #000; }
+        .log-entry .type.system { background: #888; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📈 Bengi WebSocket Price Test</h1>
+        
+        <div id="status" class="status disconnected">⏹ Disconnected</div>
+        
+        <div class="controls">
+            <input type="text" id="symbol" placeholder="Enter symbol (e.g., AAPL, GOOG, MSFT)" value="AAPL">
+            <button id="connectBtn" onclick="connect()">🔌 Connect</button>
+            <button id="subscribeBtn" onclick="subscribe()" disabled>📊 Subscribe</button>
+            <button id="disconnectBtn" onclick="disconnect()" class="disconnect" disabled>❌ Disconnect</button>
+        </div>
+        
+        <div id="prices" class="prices"></div>
+        
+        <h3 style="margin-bottom: 10px;">📝 Message Log</h3>
+        <div id="log" class="log"></div>
+    </div>
+
+    <script>
+        let ws = null;
+        const prices = {};
+        
+        function log(type, message) {
+            const logEl = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerHTML = `<span class="time">${time}</span><span class="type ${type}">${type.toUpperCase()}</span><span>${JSON.stringify(message)}</span>`;
+            logEl.insertBefore(entry, logEl.firstChild);
+        }
+        
+        function updateStatus(status, text) {
+            const statusEl = document.getElementById('status');
+            statusEl.className = `status ${status}`;
+            statusEl.textContent = text;
+        }
+        
+        function connect() {
+            updateStatus('connecting', '⏳ Connecting...');
+            log('system', 'Connecting to ws://localhost:8080/ws');
+            
+            ws = new WebSocket('ws://localhost:8080/ws');
+            
+            ws.onopen = () => {
+                updateStatus('connected', '✅ Connected');
+                log('system', 'Connected to WebSocket');
+                document.getElementById('subscribeBtn').disabled = false;
+                document.getElementById('disconnectBtn').disabled = false;
+                document.getElementById('connectBtn').disabled = true;
+            };
+            
+            ws.onmessage = (event) => {
+                try {
+                    const msg = JSON.parse(event.data);
+                    log('receive', msg);
+                    
+                    if (msg.type === 'PRICE_UPDATE' && msg.data) {
+                        const data = typeof msg.data === 'string' ? JSON.parse(msg.data) : msg.data;
+                        updatePrice(data);
+                    }
+                } catch (e) {
+                    log('receive', event.data);
+                }
+            };
+            
+            ws.onclose = () => {
+                updateStatus('disconnected', '⏹ Disconnected');
+                log('system', 'Disconnected');
+                document.getElementById('subscribeBtn').disabled = true;
+                document.getElementById('disconnectBtn').disabled = true;
+                document.getElementById('connectBtn').disabled = false;
+            };
+            
+            ws.onerror = (error) => {
+                log('system', 'Error: ' + error.message);
+            };
+        }
+        
+        function subscribe() {
+            const symbol = document.getElementById('symbol').value.toUpperCase();
+            if (!symbol) return;
+            
+            const msg = { type: 'SUBSCRIBE', topic: `price:${symbol}` };
+            ws.send(JSON.stringify(msg));
+            log('send', msg);
+            
+            // Initialize price card
+            if (!prices[symbol]) {
+                prices[symbol] = { symbol, price: 0, change: 0, changePercent: 0 };
+                renderPrices();
+            }
+        }
+        
+        function disconnect() {
+            if (ws) ws.close();
+        }
+        
+        function updatePrice(data) {
+            prices[data.symbol] = data;
+            renderPrices();
+        }
+        
+        function renderPrices() {
+            const container = document.getElementById('prices');
+            container.innerHTML = Object.values(prices).map(p => `
+                <div class="price-card">
+                    <div class="symbol">${p.symbol}</div>
+                    <div class="price">$${p.price ? p.price.toFixed(2) : '-.--'}</div>
+                    <div class="change ${p.changePercent >= 0 ? 'positive' : 'negative'}">
+                        ${p.changePercent >= 0 ? '▲' : '▼'} ${Math.abs(p.changePercent || 0).toFixed(2)}%
+                    </div>
+                </div>
+            `).join('');
+        }
+    </script>
+</body>
+</html>

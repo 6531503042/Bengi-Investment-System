@@ -44,7 +44,7 @@ func (s *AuthService) Register(ctx context.Context, req *dto.RegisterRequest) (*
 		return nil, err
 	}
 
-	user := model.User{
+	user := &model.User{
 		Email:    req.Email,
 		Password: string(hashedPassword),
 		FullName: req.FullName,

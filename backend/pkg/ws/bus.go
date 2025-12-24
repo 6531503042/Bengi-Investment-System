@@ -22,7 +22,7 @@ func NewEventBus() *EventBus {
 }
 
 func (eb *EventBus) Subscribe(topic, subscriberID string, callback Subscriber) {
-	eb.mu.RLock()
+	eb.mu.Lock()
 	defer eb.mu.Unlock()
 
 	if eb.subscribers[topic] == nil {
@@ -32,7 +32,7 @@ func (eb *EventBus) Subscribe(topic, subscriberID string, callback Subscriber) {
 }
 
 func (eb *EventBus) Unsubscribe(topic, subscribeID string) {
-	eb.mu.RLock()
+	eb.mu.Lock()
 	defer eb.mu.Unlock()
 
 	if eb.subscribers[topic] != nil {
@@ -44,7 +44,7 @@ func (eb *EventBus) Unsubscribe(topic, subscribeID string) {
 }
 
 func (eb *EventBus) UnsubscribeAll(subscriberID string) {
-	eb.mu.RLock()
+	eb.mu.Lock()
 	defer eb.mu.Unlock()
 
 	for topic := range eb.subscribers {
@@ -75,7 +75,7 @@ func (eb *EventBus) PublishBytes(topic string, data []byte) {
 
 func (eb *EventBus) HasSubscribers(topic string) bool {
 	eb.mu.RLock()
-	defer eb.mu.Unlock()
+	defer eb.mu.RUnlock()
 
 	//If subscriber map is nil, it means there are no subscribers for this topic
 	return len(eb.subscribers[topic]) > 0
@@ -83,7 +83,7 @@ func (eb *EventBus) HasSubscribers(topic string) bool {
 
 func (eb *EventBus) GetTopics() []string {
 	eb.mu.RLock()
-	defer eb.mu.Unlock()
+	defer eb.mu.RUnlock()
 
 	topics := make([]string, 0, len(eb.subscribers))
 	for topic := range eb.subscribers {
@@ -94,7 +94,7 @@ func (eb *EventBus) GetTopics() []string {
 
 func (eb *EventBus) SubscriberCount(topic string) int {
 	eb.mu.RLock()
-	defer eb.mu.Unlock()
+	defer eb.mu.RUnlock()
 	return len(eb.subscribers[topic])
 }
 

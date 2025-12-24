@@ -115,9 +115,12 @@ func (c *Client) Subscribe(topic string) {
 		c.Send <- msg.ToBytes()
 	})
 
+	// Auto-subscribe to price stream if it's a price topic
 	if len(topic) > len(TopicPricePrefix) && topic[:len(TopicPricePrefix)] == TopicPricePrefix {
 		symbol := topic[len(TopicPricePrefix):]
-		GetPriceStream().Subscribe(symbol)
+		if stream := GetPriceStream(); stream != nil && stream.IsConnected() {
+			stream.Subscribe(symbol)
+		}
 	}
 
 	// Confirm subscription
@@ -221,6 +224,14 @@ func (c *Client) WritePump() {
 
 // handleMessage handles incoming messages
 func (c *Client) handleMessage(msg *Message) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("[WS] PANIC in handleMessage for client %s: %v", c.ID, r)
+		}
+	}()
+
+	log.Printf("[WS] Handling message type=%s topic=%s from client %s", msg.Type, msg.Topic, c.ID)
+
 	switch msg.Type {
 	case TypeSubscribe:
 		c.Subscribe(msg.Topic)

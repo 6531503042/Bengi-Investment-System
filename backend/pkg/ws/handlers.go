@@ -11,6 +11,7 @@ func Initialze() {
 	InitBus()
 	InitManager()
 
+	// Start Finnhub price stream for real-time prices
 	stream := GetPriceStream()
 	if err := stream.Start(); err != nil {
 		log.Printf("[WS] Price stream error: %v", err)
