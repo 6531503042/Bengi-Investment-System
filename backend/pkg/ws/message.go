@@ -85,3 +85,12 @@ func ParseMessage(data []byte) (*Message, error) {
 	}
 	return &msg, nil
 }
+
+// ToBytes serializes the Message to JSON bytes
+func (m *Message) ToBytes() []byte {
+	data, err := json.Marshal(m)
+	if err != nil {
+		return []byte("{}")
+	}
+	return data
+}
