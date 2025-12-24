@@ -1,6 +1,8 @@
 package ws
 
 import (
+	"log"
+
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
@@ -8,6 +10,11 @@ import (
 func Initialze() {
 	InitBus()
 	InitManager()
+
+	stream := GetPriceStream()
+	if err := stream.Start(); err != nil {
+		log.Printf("[WS] Price stream error: %v", err)
+	}
 }
 
 func UpgradeMiddleware() fiber.Handler {
@@ -41,9 +48,20 @@ func RegisterRoutes(app *fiber.App) {
 	app.Get("/ws", websocket.New(Handler))
 
 	app.Get("/ws/stats", func(c *fiber.Ctx) error {
+		stream := GetPriceStream()
 		return c.JSON(fiber.Map{
-			"clients": Manager.ClientCount(),
-			"topics":  Bus.GetTopics(),
+			"clients":              Manager.ClientCount(),
+			"topics":               Bus.GetTopics(),
+			"priceStreamConnected": stream.IsConnected(),
+			"subscribedSymbols":    stream.GetSubscribedSymbols(),
+		})
+	})
+
+	app.Post("/ws/subscribe/:symbol", func(c *fiber.Ctx) error {
+		symbol := c.Params("symbol")
+		GetPriceStream().Subscribe(symbol)
+		return c.JSON(fiber.Map{
+			"message": "Subscribed to " + symbol,
 		})
 	})
 }

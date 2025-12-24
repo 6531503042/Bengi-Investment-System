@@ -115,6 +115,11 @@ func (c *Client) Subscribe(topic string) {
 		c.Send <- msg.ToBytes()
 	})
 
+	if len(topic) > len(TopicPricePrefix) && topic[:len(TopicPricePrefix)] == TopicPricePrefix {
+		symbol := topic[len(TopicPricePrefix):]
+		GetPriceStream().Subscribe(symbol)
+	}
+
 	// Confirm subscription
 	c.Send <- NewMessage(TypeSubscribed, topic, nil).ToBytes()
 	log.Printf("[WS] Client %s subscribed to %s", c.ID, topic)

@@ -21,6 +21,9 @@ type Config struct {
 	// TwelveData API
 	TwelveDataAPIKey string
 
+	// Finnhub API
+	FinnhubAPIKey string
+
 	// JWT
 	JWTSecret         string
 	JWTExpireDuration time.Duration
@@ -41,6 +44,7 @@ func LoadConfig() {
 		Env:  getEnv("ENV", "development"),
 
 		TwelveDataAPIKey: getEnv("TWELVEDATA_API_KEY", ""),
+		FinnhubAPIKey:    getEnv("FINNHUB_API_KEY", ""),
 
 		MongoURI:      getEnv("MONGO_URI", "mongodb://localhost:27017"),
 		MongoDatabase: getEnv("MONGO_DATABASE", "bengi-investment-system"),
