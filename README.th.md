@@ -78,28 +78,37 @@ bengi-investment-system/
 │   │   │   ├── controller/        # HTTP handlers
 │   │   │   ├── dto/               # Request/Response DTOs
 │   │   │   ├── model/             # Domain models
+│   │   │   ├── repository/        # Data access
 │   │   │   ├── service/           # Business logic
-│   │   │   └── module.go          # Module registration
+│   │   │   └── routes/            # Route registration
 │   │   ├── account/               # บัญชีเงิน & ธุรกรรม
 │   │   ├── portfolio/             # พอร์ตโฟลิโอ & Positions
 │   │   ├── instrument/            # ข้อมูลหุ้น
 │   │   ├── order/                 # จัดการคำสั่งซื้อ
-│   │   └── trade/                 # ดำเนินการซื้อขาย
+│   │   ├── trade/                 # ดำเนินการซื้อขาย
+│   │   └── watchlist/             # รายการหุ้นที่สนใจ
 │   │
 │   ├── pkg/                       # Shared Packages
 │   │   ├── common/                # Errors, Response, Pagination
 │   │   ├── config/                # Configuration
 │   │   ├── core/                  # Infrastructure
-│   │   │   ├── database/          # MongoDB connection
-│   │   │   ├── kafka/             # Event streaming
-│   │   │   └── redis/             # Caching
+│   │   │   └── database/          # MongoDB connection
 │   │   ├── middleware/            # Auth, RBAC, Rate Limit
-│   │   └── utils/                 # JWT, Hash, Validator
+│   │   ├── seeder/                # Database seeders
+│   │   ├── utils/                 # JWT, Hash, Validator
+│   │   └── ws/                    # WebSocket
+│   │       ├── bus.go             # Event Bus (Pub/Sub)
+│   │       ├── client.go          # Client connections
+│   │       ├── message.go         # Message types
+│   │       ├── topics.go          # Topic definitions
+│   │       ├── handlers.go        # WS handlers
+│   │       └── price.stream.go    # Finnhub price streaming
 │   │
 │   ├── main.go                    # Entry point
 │   ├── go.mod
 │   └── go.sum
 │
+├── ROADMAP.md
 └── README.md
 ```
 
@@ -129,8 +138,8 @@ bengi-investment-system/
 
 ### External APIs
 | Service | วัตถุประสงค์ |
-|---------|-------------|
-| **Twelve Data** | ข้อมูลตลาด Real-time & ย้อนหลัง (WebSocket API) |
+|---------|--------------|
+| **Finnhub** | ข้อมูลตลาด Real-time (WebSocket API - ฟรีไม่จำกัด) |
 
 ### DevOps (วางแผนไว้)
 | เทคโนโลยี | วัตถุประสงค์ |
@@ -162,14 +171,14 @@ bengi-investment-system/
 ### Real-time WebSocket Flow
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│ Twelve Data │─────▶│ Price Sync  │─────▶│    Redis    │
-│  WebSocket  │      │  Service    │      │   Pub/Sub   │
+│   Finnhub   │─────▶│ PriceStream │─────▶│  Event Bus  │
+│  WebSocket  │      │  Service    │      │  (Pub/Sub)  │
 └─────────────┘      └──────┬──────┘      └──────┬──────┘
                             │                    │
                             ▼                    ▼
                      ┌─────────────┐      ┌─────────────┐
-                     │    Kafka    │─────▶│   Fiber     │
-                     │(Price Topic)│      │  WebSocket  │
+                     │  Broadcast  │─────▶│   Fiber     │
+                     │ to Clients  │      │  WebSocket  │
                      └─────────────┘      └──────┬──────┘
                                                  │
                                                  ▼
@@ -238,22 +247,23 @@ go run main.go
 
 ```env
 # Server
-PORT=3000
+PORT=8080
 ENV=development
 
 # MongoDB
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DATABASE=bengi_investment
+MONGO_URI=mongodb://localhost:27017
+MONGO_DATABASE=bengi-investment-system
 
-# Redis
+# Redis (ไม่บังคับ)
 REDIS_URI=redis://localhost:6379
 
 # JWT
 JWT_SECRET=your-super-secret-key
-JWT_EXPIRES_IN=24h
+JWT_EXPIRE_DURATION=24h
 
-# Twelve Data API
-TWELVE_DATA_API_KEY=your-api-key
+# Finnhub API (ฟรี - Real-time WebSocket)
+# สมัครฟรีได้ที่: https://finnhub.io/register
+FINNHUB_API_KEY=your-finnhub-api-key
 ```
 
 ---
@@ -292,7 +302,7 @@ TWELVE_DATA_API_KEY=your-api-key
 |---------|--------|------|----------|
 | หลายพอร์ต | ✅ | ❌ | ✅ |
 | P&L แบบ Lot | ✅ | ✅ | ✅ (FIFO/LIFO) |
-| ข้อมูล Real-time | ✅ | ✅ | ✅ (Twelve Data) |
+| ข้อมูล Real-time | ✅ | ✅ | ✅ (Finnhub) |
 | Open Source | ❌ | ❌ | ✅ |
 | Self-hosted | ❌ | ❌ | ✅ |
 | ปรับแต่งได้ | ❌ | ❌ | ✅ |

@@ -79,28 +79,37 @@ bengi-investment-system/
 │   │   │   ├── controller/        # HTTP handlers
 │   │   │   ├── dto/               # Request/Response DTOs
 │   │   │   ├── model/             # Domain models
+│   │   │   ├── repository/        # Data access
 │   │   │   ├── service/           # Business logic
-│   │   │   └── module.go          # Module registration
+│   │   │   └── routes/            # Route registration
 │   │   ├── account/               # Cash & Transactions
 │   │   ├── portfolio/             # Portfolios & Positions
 │   │   ├── instrument/            # Market Data
 │   │   ├── order/                 # Order Management
-│   │   └── trade/                 # Trade Execution
+│   │   ├── trade/                 # Trade Execution
+│   │   └── watchlist/             # Watchlists
 │   │
 │   ├── pkg/                       # Shared Packages
 │   │   ├── common/                # Errors, Response, Pagination
 │   │   ├── config/                # Configuration
 │   │   ├── core/                  # Infrastructure
-│   │   │   ├── database/          # MongoDB connection
-│   │   │   ├── kafka/             # Event streaming
-│   │   │   └── redis/             # Caching
+│   │   │   └── database/          # MongoDB connection
 │   │   ├── middleware/            # Auth, RBAC, Rate Limit
-│   │   └── utils/                 # JWT, Hash, Validator
+│   │   ├── seeder/                # Database seeders
+│   │   ├── utils/                 # JWT, Hash, Validator
+│   │   └── ws/                    # WebSocket
+│   │       ├── bus.go             # Event Bus (Pub/Sub)
+│   │       ├── client.go          # Client connections
+│   │       ├── message.go         # Message types
+│   │       ├── topics.go          # Topic definitions
+│   │       ├── handlers.go        # WS handlers
+│   │       └── price.stream.go    # Finnhub price streaming
 │   │
 │   ├── main.go                    # Entry point
 │   ├── go.mod
 │   └── go.sum
 │
+├── ROADMAP.md
 └── README.md
 ```
 
@@ -131,7 +140,7 @@ bengi-investment-system/
 ### External APIs
 | Service | Purpose |
 |---------|---------|
-| **Twelve Data** | Real-time & historical market data (WebSocket API) |
+| **Finnhub** | Real-time market data (WebSocket API - Free unlimited) |
 
 ### DevOps (Planned)
 | Technology | Purpose |
@@ -163,14 +172,14 @@ bengi-investment-system/
 ### Real-time WebSocket Flow
 ```
 ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-│ Twelve Data │─────▶│ Price Sync  │─────▶│    Redis    │
-│  WebSocket  │      │  Service    │      │   Pub/Sub   │
+│   Finnhub   │─────▶│ PriceStream │─────▶│  Event Bus  │
+│  WebSocket  │      │  Service    │      │  (Pub/Sub)  │
 └─────────────┘      └──────┬──────┘      └──────┬──────┘
                             │                    │
                             ▼                    ▼
                      ┌─────────────┐      ┌─────────────┐
-                     │    Kafka    │─────▶│   Fiber     │
-                     │(Price Topic)│      │  WebSocket  │
+                     │  Broadcast  │─────▶│   Fiber     │
+                     │ to Clients  │      │  WebSocket  │
                      └─────────────┘      └──────┬──────┘
                                                  │
                                                  ▼
@@ -239,22 +248,23 @@ go run main.go
 
 ```env
 # Server
-PORT=3000
+PORT=8080
 ENV=development
 
 # MongoDB
-MONGODB_URI=mongodb://localhost:27017
-MONGODB_DATABASE=bengi_investment
+MONGO_URI=mongodb://localhost:27017
+MONGO_DATABASE=bengi-investment-system
 
-# Redis
+# Redis (Optional)
 REDIS_URI=redis://localhost:6379
 
 # JWT
 JWT_SECRET=your-super-secret-key
-JWT_EXPIRES_IN=24h
+JWT_EXPIRE_DURATION=24h
 
-# Twelve Data API
-TWELVE_DATA_API_KEY=your-api-key
+# Finnhub API (Free - Real-time WebSocket)
+# Get your free API key at: https://finnhub.io/register
+FINNHUB_API_KEY=your-finnhub-api-key
 ```
 
 ---
@@ -293,7 +303,7 @@ TWELVE_DATA_API_KEY=your-api-key
 |---------|--------|------|----------|
 | Multi-Portfolio | ✅ | ❌ | ✅ |
 | Lot-based P&L | ✅ | ✅ | ✅ (FIFO/LIFO) |
-| Real-time Data | ✅ | ✅ | ✅ (Twelve Data) |
+| Real-time Data | ✅ | ✅ | ✅ (Finnhub) |
 | Open Source | ❌ | ❌ | ✅ |
 | Self-hosted | ❌ | ❌ | ✅ |
 | Customizable | ❌ | ❌ | ✅ |
