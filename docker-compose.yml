@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # Application
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - ENV=production
+      - MONGO_URI=mongodb://mongodb:27017
+      - MONGO_DATABASE=bengi-investment-system
+      - REDIS_URI=redis://redis:6379
+      - KAFKA_BROKERS=kafka:9092
+      - KAFKA_GROUP_ID=bengi-investment
+      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key}
+      - FINNHUB_API_KEY=${FINNHUB_API_KEY}
+      - TWELVEDATA_API_KEY=${TWELVEDATA_API_KEY}
+    depends_on:
+      - mongodb
+      - redis
+      - kafka
+    restart: unless-stopped
+    networks:
+      - bengi-network
+
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    restart: unless-stopped
+    networks:
+      - bengi-network
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    networks:
+      - bengi-network
+
+  # Zookeeper (required for Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
+    networks:
+      - bengi-network
+
+  # Kafka
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    depends_on:
+      - zookeeper
+    restart: unless-stopped
+    networks:
+      - bengi-network
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+
+networks:
+  bengi-network:
+    driver: bridge
