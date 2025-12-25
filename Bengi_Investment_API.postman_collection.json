@@ -1,0 +1,569 @@
+{
+  "info": {
+    "name": "Bengi Investment System API",
+    "description": "Complete API collection for Bengi Investment System\n\n**Base URL:** http://localhost:8080\n\n**Authentication:** Most endpoints require JWT token. Login first, then the token is auto-saved.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Auth",
+      "description": "Authentication endpoints",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\",\n  \"name\": \"John Doe\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.data && jsonData.data.accessToken) {",
+                  "    pm.collectionVariables.set('accessToken', jsonData.data.accessToken);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/login"
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Content-Type", "value": "application/json"}],
+            "url": "{{baseUrl}}/api/v1/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/auth/logout"
+          }
+        },
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/auth/profile"
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"password123\",\n  \"newPassword\": \"newpassword456\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/auth/password"
+          }
+        }
+      ]
+    },
+    {
+      "name": "💰 Account",
+      "description": "Account management (Auth required)",
+      "item": [
+        {
+          "name": "Create Account",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Trading Account\",\n  \"currency\": \"USD\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/accounts"
+          }
+        },
+        {
+          "name": "Get All Accounts",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/accounts"
+          }
+        },
+        {
+          "name": "Get Account by ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/accounts/:id"
+          }
+        },
+        {
+          "name": "Deposit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 10000\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/accounts/:id/deposit"
+          }
+        },
+        {
+          "name": "Withdraw",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 500\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/accounts/:id/withdraw"
+          }
+        },
+        {
+          "name": "Get Transactions",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/accounts/:id/transactions"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📈 Instrument",
+      "description": "Stock/Instrument data",
+      "item": [
+        {
+          "name": "Get All Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "instruments"],
+              "query": [{"key": "page", "value": "1"}, {"key": "limit", "value": "20"}]
+            }
+          }
+        },
+        {
+          "name": "Search Instruments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/instruments/search?q=AAPL",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "instruments", "search"],
+              "query": [{"key": "q", "value": "AAPL"}]
+            }
+          }
+        },
+        {
+          "name": "Get Instrument by Symbol",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/instruments/AAPL"
+          }
+        },
+        {
+          "name": "Get Quote",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/v1/instruments/AAPL/quote"
+          }
+        },
+        {
+          "name": "[Admin] Create Instrument",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"TSLA\",\n  \"name\": \"Tesla Inc\",\n  \"exchange\": \"NASDAQ\",\n  \"type\": \"stock\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/instruments"
+          }
+        },
+        {
+          "name": "[Admin] Update Instrument",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tesla Inc Updated\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/instruments/TSLA"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📊 Portfolio",
+      "description": "Portfolio management (Auth required)",
+      "item": [
+        {
+          "name": "Create Portfolio",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Growth Portfolio\",\n  \"accountId\": \"{{accountId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/portfolios"
+          }
+        },
+        {
+          "name": "Get All Portfolios",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/portfolios"
+          }
+        },
+        {
+          "name": "Get Portfolio by ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/portfolios/:id"
+          }
+        },
+        {
+          "name": "Get Portfolio Summary",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/portfolios/:id/summary"
+          }
+        },
+        {
+          "name": "Update Portfolio",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Portfolio Name\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/portfolios/:id"
+          }
+        },
+        {
+          "name": "Delete Portfolio",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/portfolios/:id"
+          }
+        },
+        {
+          "name": "Get Positions",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/portfolios/:id/positions"
+          }
+        },
+        {
+          "name": "Get Position Detail",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/positions/:id"
+          }
+        }
+      ]
+    },
+    {
+      "name": "📝 Order",
+      "description": "Order management (Auth required)",
+      "item": [
+        {
+          "name": "Create Order (Market Buy)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"portfolioId\": \"{{portfolioId}}\",\n  \"symbol\": \"AAPL\",\n  \"side\": \"BUY\",\n  \"type\": \"MARKET\",\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/orders"
+          }
+        },
+        {
+          "name": "Create Order (Limit Sell)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"portfolioId\": \"{{portfolioId}}\",\n  \"symbol\": \"AAPL\",\n  \"side\": \"SELL\",\n  \"type\": \"LIMIT\",\n  \"quantity\": 5,\n  \"price\": 200.00,\n  \"timeInForce\": \"GTC\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/orders"
+          }
+        },
+        {
+          "name": "Get All Orders",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/orders?status=PENDING",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "orders"],
+              "query": [{"key": "status", "value": "PENDING"}]
+            }
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/orders/:id"
+          }
+        },
+        {
+          "name": "Cancel Order",
+          "request": {
+            "method": "POST",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/orders/:id/cancel"
+          }
+        },
+        {
+          "name": "Get Trades for Order",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/orders/:id/trades"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🔄 Trade",
+      "description": "Trade history (Auth required)",
+      "item": [
+        {
+          "name": "Get All Trades",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/trades?symbol=AAPL",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "trades"],
+              "query": [{"key": "symbol", "value": "AAPL"}]
+            }
+          }
+        },
+        {
+          "name": "Get Trade by ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/trades/:id"
+          }
+        },
+        {
+          "name": "Get Trade Summary",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/trades/summary"
+          }
+        },
+        {
+          "name": "[Admin] Execute Trade",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"price\": 195.50,\n  \"quantity\": 10\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/trades/execute"
+          }
+        }
+      ]
+    },
+    {
+      "name": "⭐ Watchlist",
+      "description": "Watchlist management (Auth required)",
+      "item": [
+        {
+          "name": "Create Watchlist",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Tech Stocks\",\n  \"symbols\": [\"AAPL\", \"GOOGL\", \"MSFT\"]\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/watchlists"
+          }
+        },
+        {
+          "name": "Get All Watchlists",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/watchlists"
+          }
+        },
+        {
+          "name": "Get Watchlist by ID",
+          "request": {
+            "method": "GET",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/watchlists/:id"
+          }
+        },
+        {
+          "name": "Update Watchlist",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Name\",\n  \"isDefault\": true\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/watchlists/:id"
+          }
+        },
+        {
+          "name": "Delete Watchlist",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/watchlists/:id"
+          }
+        },
+        {
+          "name": "Add Symbol",
+          "request": {
+            "method": "POST",
+            "header": [
+              {"key": "Authorization", "value": "Bearer {{accessToken}}"},
+              {"key": "Content-Type", "value": "application/json"}
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"symbol\": \"NVDA\"\n}"
+            },
+            "url": "{{baseUrl}}/api/v1/watchlists/:id/symbols"
+          }
+        },
+        {
+          "name": "Remove Symbol",
+          "request": {
+            "method": "DELETE",
+            "header": [{"key": "Authorization", "value": "Bearer {{accessToken}}"}],
+            "url": "{{baseUrl}}/api/v1/watchlists/:id/symbols/NVDA"
+          }
+        }
+      ]
+    },
+    {
+      "name": "🌐 WebSocket",
+      "description": "Real-time WebSocket endpoints\n\n**Connection:** ws://localhost:8080/ws\n\n**Message Format:**\n```json\n{\"type\":\"SUBSCRIBE\",\"topic\":\"price:BINANCE:BTCUSDT\"}\n```",
+      "item": [
+        {
+          "name": "WS Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/ws/stats"
+          }
+        },
+        {
+          "name": "Subscribe Symbol (HTTP)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": "{{baseUrl}}/ws/subscribe/BINANCE:BTCUSDT"
+          }
+        }
+      ]
+    }
+  ]
+}

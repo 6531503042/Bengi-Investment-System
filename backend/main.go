@@ -10,6 +10,7 @@ import (
 	portfolioRoutes "github.com/bricksocoolxd/bengi-investment-system/module/portfolio/routes"
 	tradeRoutes "github.com/bricksocoolxd/bengi-investment-system/module/trade/routes"
 	watchlistRoutes "github.com/bricksocoolxd/bengi-investment-system/module/watchlist/routes"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/cache"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/config"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/core/database"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/seeder"
@@ -23,6 +24,11 @@ func main() {
 
 	config.LoadConfig()
 	database.ConnextMongoDB()
+
+	// Initialize Redis (optional - continues if Redis is unavailable)
+	if err := cache.Initialize(); err != nil {
+		log.Printf("⚠️ Redis not available: %v (caching disabled)", err)
+	}
 
 	// Run seeders (create default roles, etc.)
 	seeder.RunSeeders()
