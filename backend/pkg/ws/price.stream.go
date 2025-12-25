@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/cache"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/config"
 	"github.com/gorilla/websocket"
 )
@@ -284,6 +285,9 @@ func (ps *PriceStream) handleTrades(trades []FinnhubTrade) {
 
 		// Publish to Event Bus
 		PublishPrice(symbol, payload)
+
+		// Cache quote in Redis for API access
+		cache.SetQuoteFromPrice(symbol, trade.Price, change, changePercent, int64(trade.Volume))
 	}
 }
 

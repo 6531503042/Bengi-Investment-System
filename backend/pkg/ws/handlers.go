@@ -3,6 +3,7 @@ package ws
 import (
 	"log"
 
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/cache"
 	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
@@ -56,6 +57,11 @@ func RegisterRoutes(app *fiber.App) {
 			"priceStreamConnected": stream.IsConnected(),
 			"subscribedSymbols":    stream.GetSubscribedSymbols(),
 		})
+	})
+
+	// Cache stats endpoint
+	app.Get("/ws/cache/stats", func(c *fiber.Ctx) error {
+		return c.JSON(cache.CacheStats())
 	})
 
 	app.Post("/ws/subscribe/:symbol", func(c *fiber.Ctx) error {
