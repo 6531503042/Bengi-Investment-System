@@ -78,10 +78,31 @@ func (ctrl *AuthController) RefreshToken(c *fiber.Ctx) error {
 }
 
 func (ctrl *AuthController) Logout(c *fiber.Ctx) error {
+	// Delete session from Redis
+	sessionID := c.Get("X-Session-ID")
+	if sessionID != "" {
+		_ = ctrl.authService.Logout(c.Context(), sessionID)
+	}
 
 	utils.ClearAuthCookies(c)
 
 	return common.Success(c, nil, "Logout successful")
+}
+
+// LogoutAll logs out from all devices
+func (ctrl *AuthController) LogoutAll(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return common.Unauthorized(c, "User not authenticated")
+	}
+
+	if err := ctrl.authService.LogoutAll(c.Context(), userID); err != nil {
+		return common.InternalError(c, err.Error())
+	}
+
+	utils.ClearAuthCookies(c)
+
+	return common.Success(c, nil, "Logged out from all devices")
 }
 
 func (ctrl *AuthController) GetProfile(c *fiber.Ctx) error {

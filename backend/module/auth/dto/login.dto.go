@@ -9,6 +9,7 @@ type (
 	LoginResponse struct {
 		AccessToken  string      `json:"accessToken"`
 		RefreshToken string      `json:"refreshToken"`
+		SessionID    string      `json:"sessionId,omitempty"`
 		User         UserProfile `json:"user"`
 	}
 

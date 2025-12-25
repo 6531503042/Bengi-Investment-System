@@ -3,11 +3,14 @@ package service
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/bricksocoolxd/bengi-investment-system/module/auth/dto"
 	"github.com/bricksocoolxd/bengi-investment-system/module/auth/model"
 	"github.com/bricksocoolxd/bengi-investment-system/module/auth/repository"
+	"github.com/bricksocoolxd/bengi-investment-system/pkg/cache"
 	"github.com/bricksocoolxd/bengi-investment-system/pkg/utils"
+	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,6 +21,7 @@ var (
 	ErrUserNotFound        = errors.New("user not found")
 	ErrInvalidRefreshToken = errors.New("invalid refresh token")
 	ErrWrongPassword       = errors.New("current password is incorrect")
+	ErrSessionNotFound     = errors.New("session not found or expired")
 )
 
 type AuthService struct {
@@ -85,9 +89,25 @@ func (s *AuthService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 		return nil, err
 	}
 
+	// Store session in Redis (if available)
+	sessionID := uuid.New().String()
+	if cache.IsConnected() {
+		session := &cache.Session{
+			UserID:       user.ID.Hex(),
+			Email:        user.Email,
+			Role:         user.RoleID.Hex(),
+			AccessToken:  accessToken,
+			RefreshToken: refreshToken,
+			CreatedAt:    time.Now().UnixMilli(),
+			ExpiresAt:    time.Now().Add(24 * time.Hour).UnixMilli(),
+		}
+		_ = cache.SetSession(sessionID, session, 24*time.Hour)
+	}
+
 	return &dto.LoginResponse{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		SessionID:    sessionID,
 		User: dto.UserProfile{
 			ID:       user.ID.Hex(),
 			Email:    user.Email,
@@ -95,6 +115,31 @@ func (s *AuthService) Login(ctx context.Context, req *dto.LoginRequest) (*dto.Lo
 			RoleID:   user.RoleID.Hex(),
 		},
 	}, nil
+}
+
+// Logout removes the session from Redis
+func (s *AuthService) Logout(ctx context.Context, sessionID string) error {
+	if cache.IsConnected() && sessionID != "" {
+		return cache.DeleteSession(sessionID)
+	}
+	return nil
+}
+
+// LogoutAll removes all sessions for a user
+func (s *AuthService) LogoutAll(ctx context.Context, userID string) error {
+	if cache.IsConnected() {
+		return cache.DeleteAllUserSessions(userID)
+	}
+	return nil
+}
+
+// ValidateSession checks if a session is valid
+func (s *AuthService) ValidateSession(ctx context.Context, sessionID string) (bool, error) {
+	if !cache.IsConnected() {
+		// If Redis not available, skip session validation
+		return true, nil
+	}
+	return cache.ValidateSession(sessionID)
 }
 
 func (s *AuthService) GetProfile(ctx context.Context, userID string) (*dto.UserProfile, error) {
@@ -136,9 +181,25 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (*d
 		return nil, err
 	}
 
+	// Create new session
+	sessionID := uuid.New().String()
+	if cache.IsConnected() {
+		session := &cache.Session{
+			UserID:       user.ID.Hex(),
+			Email:        user.Email,
+			Role:         user.RoleID.Hex(),
+			AccessToken:  newAccessToken,
+			RefreshToken: newRefreshToken,
+			CreatedAt:    time.Now().UnixMilli(),
+			ExpiresAt:    time.Now().Add(24 * time.Hour).UnixMilli(),
+		}
+		_ = cache.SetSession(sessionID, session, 24*time.Hour)
+	}
+
 	return &dto.LoginResponse{
 		AccessToken:  newAccessToken,
 		RefreshToken: newRefreshToken,
+		SessionID:    sessionID,
 		User: dto.UserProfile{
 			ID:       user.ID.Hex(),
 			Email:    user.Email,
