@@ -30,6 +30,10 @@ type Config struct {
 
 	// Redis (Optional)
 	RedisURI string
+
+	// Kafka (Optional)
+	KafkaBrokers string
+	KafkaGroupID string
 }
 
 var AppConfig *Config
@@ -53,6 +57,9 @@ func LoadConfig() {
 		JWTExpireDuration: parseDuration(getEnv("JWT_EXPIRE_DURATION", "24h")),
 
 		RedisURI: getEnv("REDIS_URI", "redis://localhost:6379"),
+
+		KafkaBrokers: getEnv("KAFKA_BROKERS", "localhost:9092"),
+		KafkaGroupID: getEnv("KAFKA_GROUP_ID", "bengi-investment"),
 	}
 }
 
