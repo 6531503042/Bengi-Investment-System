@@ -295,6 +295,7 @@ func (ps *PriceStream) Subscribe(symbols ...string) {
 		if !ps.symbols[sym] {
 			ps.symbols[sym] = true
 			newSymbols = append(newSymbols, sym)
+			log.Printf("[PriceStream] Added symbol to watch: %s (total: %d)", sym, len(ps.symbols))
 		}
 	}
 	ps.mu.Unlock()

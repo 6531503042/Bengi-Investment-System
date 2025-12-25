@@ -58,7 +58,7 @@ func (eb *EventBus) UnsubscribeAll(subscriberID string) {
 func (eb *EventBus) Publish(topic string, msg *Message) {
 	eb.mu.RLock()
 	subs := eb.subscribers[topic]
-	eb.mu.Unlock()
+	eb.mu.RUnlock() // Fixed: was Unlock() causing crash
 
 	for _, callback := range subs {
 		go callback(msg)
