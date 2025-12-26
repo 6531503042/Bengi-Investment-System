@@ -46,8 +46,11 @@ func Handler(c *websocket.Conn) {
 func RegisterRoutes(app *fiber.App) {
 	Initialze()
 
+	// WebSocket endpoints - both /ws and /ws/prices work
 	app.Get("/ws", UpgradeMiddleware())
 	app.Get("/ws", websocket.New(Handler))
+	app.Get("/ws/prices", UpgradeMiddleware())
+	app.Get("/ws/prices", websocket.New(Handler))
 
 	app.Get("/ws/stats", func(c *fiber.Ctx) error {
 		stream := GetPriceStream()
