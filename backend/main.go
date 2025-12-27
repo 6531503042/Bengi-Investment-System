@@ -53,6 +53,7 @@ func main() {
 	// Register modules
 	authRoutes.RegisterRoutes(app)
 	accountRoutes.RegisterRoutes(app)
+	accountRoutes.RegisterDemoRoutes(app) // Demo trading routes
 	instrumentRoutes.RegisterRoutes(app)
 	portfolioRoutes.RegisterRoutes(app)
 	orderRoutes.RegisterRoutes(app)
