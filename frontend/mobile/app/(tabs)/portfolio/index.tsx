@@ -1,128 +1,273 @@
-import { useEffect } from 'react'
-import { StyleSheet, ScrollView, StatusBar } from 'react-native'
+import { useState, useEffect } from 'react'
+import { StyleSheet, ScrollView, StatusBar, RefreshControl, TouchableOpacity } from 'react-native'
 import { YStack, XStack, Text, View, Button } from 'tamagui'
-import { LinearGradient } from 'expo-linear-gradient'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { usePortfolioStore } from '@/stores/portfolio'
-import { useMarketStore } from '@/stores/market'
+import { useRouter } from 'expo-router'
+import { Ionicons } from '@expo/vector-icons'
+import { useDemoStore } from '@/stores/demo'
 import { dimeTheme } from '@/constants/theme'
-import { PriceChip } from '@/components/common/PriceChip'
-import { HoldingCard } from '@/components/portfolio/HoldingCard'
-import type { Portfolio, Position } from '@/types/portfolio'
+import { PortfolioCard } from '@/components/portfolio/PortfolioCard'
+import { HoldingItem } from '@/components/portfolio/HoldingItem'
+import { OptionItem } from '@/components/portfolio/OptionItem'
 
-// Mock holdings data for demo
+// Mock holdings data
 const MOCK_HOLDINGS = [
-    { symbol: 'AAPL', name: 'Apple Inc.', quantity: 10, avgCost: 145.00, currentPrice: 178.50 },
-    { symbol: 'GOOGL', name: 'Alphabet Inc.', quantity: 5, avgCost: 125.00, currentPrice: 142.30 },
-    { symbol: 'TSLA', name: 'Tesla Inc.', quantity: 8, avgCost: 220.00, currentPrice: 248.75 },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://logo.clearbit.com/nvidia.com', quantity: 15, avgCost: 120.50, currentPrice: 134.82 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://logo.clearbit.com/tesla.com', quantity: 8, avgCost: 245.00, currentPrice: 421.06 },
+    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://logo.clearbit.com/apple.com', quantity: 25, avgCost: 168.00, currentPrice: 254.49 },
+    { symbol: 'AMZN', name: 'Amazon.com Inc.', logoUrl: 'https://logo.clearbit.com/amazon.com', quantity: 12, avgCost: 142.50, currentPrice: 227.05 },
+    { symbol: 'PLTR', name: 'Palantir Technologies', logoUrl: 'https://logo.clearbit.com/palantir.com', quantity: 100, avgCost: 18.50, currentPrice: 75.14 },
 ]
 
+// Mock options data
+const MOCK_OPTIONS = [
+    { symbol: 'QBTS', name: 'D-Wave Quantum', logoUrl: 'https://logo.clearbit.com/dwavesys.com', type: 'Put' as const, strike: 22.50, expiry: 'Jan 9, 2025', contracts: 1, premium: 0.25, currentPrice: 0.68, delta: -0.24 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://logo.clearbit.com/tesla.com', type: 'Call' as const, strike: 450.00, expiry: 'Feb 21, 2025', contracts: 2, premium: 12.50, currentPrice: 18.75, delta: 0.45 },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://logo.clearbit.com/nvidia.com', type: 'Call' as const, strike: 150.00, expiry: 'Mar 14, 2025', contracts: 3, premium: 8.20, currentPrice: 5.35, delta: 0.38 },
+]
+
+// Portfolio tabs - short labels for mobile
+const PORTFOLIO_TABS = [
+    { id: 'all', name: '← All', color: dimeTheme.colors.textSecondary },
+    { id: 'stocks', name: '📈 Stocks', color: '#4CAF50' },
+    { id: 'options', name: '🎯 Options', color: '#9C27B0' },
+]
+
+type FilterType = 'all' | 'stocks' | 'options'
+type SortOption = 'value' | 'pnl' | 'allocation'
+
 export default function PortfolioScreen() {
-    const { portfolios = [], fetchPortfolios } = usePortfolioStore()
-    const { quotes } = useMarketStore()
+    const router = useRouter()
+    const { account, fetchDemo } = useDemoStore()
+    const [refreshing, setRefreshing] = useState(false)
+    const [activeTab, setActiveTab] = useState<FilterType>('all')
+    const [sortBy, setSortBy] = useState<SortOption>('value')
 
     useEffect(() => {
-        fetchPortfolios()
+        fetchDemo()
     }, [])
 
-    const safePortfolios = portfolios ?? []
-    const totalValue = MOCK_HOLDINGS.reduce((sum, h) => sum + (h.quantity * h.currentPrice), 0)
-    const totalCost = MOCK_HOLDINGS.reduce((sum, h) => sum + (h.quantity * h.avgCost), 0)
-    const totalPL = totalValue - totalCost
-    const totalPLPercent = totalCost > 0 ? (totalPL / totalCost) * 100 : 0
+    const onRefresh = async () => {
+        setRefreshing(true)
+        await fetchDemo()
+        setRefreshing(false)
+    }
+
+    // Calculate portfolio stats from holdings
+    const calculateStats = () => {
+        let stocksValue = 0
+        let stocksCost = 0
+        let optionsValue = 0
+        let optionsCost = 0
+
+        MOCK_HOLDINGS.forEach(h => {
+            stocksValue += h.quantity * h.currentPrice
+            stocksCost += h.quantity * h.avgCost
+        })
+
+        MOCK_OPTIONS.forEach(o => {
+            optionsValue += o.contracts * 100 * o.currentPrice
+            optionsCost += o.contracts * 100 * o.premium
+        })
+
+        const totalValue = stocksValue + optionsValue
+        const totalCost = stocksCost + optionsCost
+        const totalPnl = totalValue - totalCost
+        const totalPnlPercent = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
+
+        return {
+            totalValue,
+            totalCost,
+            totalPnl,
+            totalPnlPercent,
+            stocksValue,
+            optionsValue,
+            initialValue: account?.initialBalance ?? 10000,
+            dailyChange: 2.15, // Mock positive daily change
+        }
+    }
+
+    const stats = calculateStats()
+
+    // Calculate allocation for each holding
+    const holdingsWithAllocation = MOCK_HOLDINGS.map(h => ({
+        ...h,
+        allocation: (h.quantity * h.currentPrice) / stats.totalValue * 100
+    }))
+
+    // Sort holdings
+    const sortedHoldings = [...holdingsWithAllocation].sort((a, b) => {
+        switch (sortBy) {
+            case 'value':
+                return (b.quantity * b.currentPrice) - (a.quantity * a.currentPrice)
+            case 'pnl':
+                const pnlA = ((a.currentPrice - a.avgCost) / a.avgCost) * 100
+                const pnlB = ((b.currentPrice - b.avgCost) / b.avgCost) * 100
+                return pnlB - pnlA
+            case 'allocation':
+                return b.allocation - a.allocation
+            default:
+                return 0
+        }
+    })
+
+    // Filter based on active tab
+    const showStocks = activeTab === 'all' || activeTab === 'stocks'
+    const showOptions = activeTab === 'all' || activeTab === 'options'
 
     return (
         <View style={styles.container}>
             <StatusBar barStyle="light-content" />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Header */}
-                    <YStack padding="$4" paddingBottom="$2">
-                        <Text color={dimeTheme.colors.textPrimary} fontSize="$8" fontWeight="bold">
+                {/* Header */}
+                <XStack paddingHorizontal="$4" paddingVertical="$3" alignItems="center" justifyContent="space-between">
+                    <XStack alignItems="center" gap="$2">
+                        <Text color={dimeTheme.colors.textPrimary} fontSize={24} fontWeight="bold">
                             Portfolio
                         </Text>
-                    </YStack>
+                        <Ionicons name="eye-outline" size={20} color={dimeTheme.colors.textSecondary} />
+                    </XStack>
+                    <TouchableOpacity>
+                        <Ionicons name="ellipsis-vertical" size={20} color={dimeTheme.colors.textSecondary} />
+                    </TouchableOpacity>
+                </XStack>
 
-                    {/* Portfolio Value Card */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
-                        <LinearGradient
-                            colors={[dimeTheme.colors.surface, dimeTheme.colors.backgroundSecondary]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={styles.valueCard}
+                {/* Filter Tabs */}
+                <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.tabsContainer}
+                >
+                    {PORTFOLIO_TABS.map(tab => (
+                        <TouchableOpacity
+                            key={tab.id}
+                            style={[
+                                styles.tabButton,
+                                activeTab === tab.id && styles.tabButtonActive,
+                                activeTab === tab.id && { borderColor: tab.color }
+                            ]}
+                            onPress={() => setActiveTab(tab.id as FilterType)}
                         >
-                            <Text color={dimeTheme.colors.textSecondary} fontSize="$3" marginBottom="$2">
-                                Total Value
-                            </Text>
-                            <Text color={dimeTheme.colors.textPrimary} fontSize="$10" fontWeight="bold">
-                                ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                            </Text>
-                            <XStack marginTop="$3" alignItems="center" gap="$3">
-                                <PriceChip value={totalPLPercent} size="md" />
-                                <Text color={dimeTheme.colors.textSecondary} fontSize="$3">
-                                    {totalPL >= 0 ? '+' : ''}${totalPL.toFixed(2)} all time
-                                </Text>
-                            </XStack>
-                        </LinearGradient>
-                    </YStack>
-
-                    {/* Holdings Summary */}
-                    <XStack paddingHorizontal="$4" gap="$3" marginBottom="$4">
-                        <View style={styles.summaryCard}>
-                            <Text color={dimeTheme.colors.textTertiary} fontSize="$2">
-                                Invested
-                            </Text>
-                            <Text color={dimeTheme.colors.textPrimary} fontSize="$4" fontWeight="bold">
-                                ${totalCost.toFixed(2)}
-                            </Text>
-                        </View>
-                        <View style={styles.summaryCard}>
-                            <Text color={dimeTheme.colors.textTertiary} fontSize="$2">
-                                Profit/Loss
-                            </Text>
                             <Text
-                                color={totalPL >= 0 ? dimeTheme.colors.profit : dimeTheme.colors.loss}
-                                fontSize="$4"
-                                fontWeight="bold"
+                                color={activeTab === tab.id ? tab.color : dimeTheme.colors.textSecondary}
+                                fontWeight={activeTab === tab.id ? '600' : '400'}
+                                fontSize={13}
                             >
-                                {totalPL >= 0 ? '+' : ''}${totalPL.toFixed(2)}
+                                {tab.name}
                             </Text>
-                        </View>
+                        </TouchableOpacity>
+                    ))}
+                </ScrollView>
+
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={onRefresh}
+                            tintColor={dimeTheme.colors.primary}
+                        />
+                    }
+                >
+                    {/* Portfolio Card */}
+                    <PortfolioCard
+                        totalValue={activeTab === 'options' ? stats.optionsValue : activeTab === 'stocks' ? stats.stocksValue : stats.totalValue}
+                        initialValue={stats.initialValue}
+                        dailyChangePercent={stats.dailyChange}
+                        totalPnlPercent={stats.totalPnlPercent}
+                        totalPnlAmount={stats.totalPnl}
+                    />
+
+                    {/* Holdings Header */}
+                    <XStack
+                        paddingHorizontal="$4"
+                        paddingTop="$4"
+                        paddingBottom="$2"
+                        justifyContent="space-between"
+                        alignItems="center"
+                    >
+                        <XStack alignItems="center" gap="$2">
+                            <Text color={dimeTheme.colors.textSecondary} fontSize={12}>
+                                Sort by:
+                            </Text>
+                            <TouchableOpacity
+                                style={styles.sortButton}
+                                onPress={() => {
+                                    const options: SortOption[] = ['value', 'pnl', 'allocation']
+                                    const current = options.indexOf(sortBy)
+                                    setSortBy(options[(current + 1) % options.length])
+                                }}
+                            >
+                                <Text color={dimeTheme.colors.textPrimary} fontSize={12} fontWeight="600">
+                                    {sortBy === 'value' ? 'Value' : sortBy === 'pnl' ? 'P&L %' : 'Allocation'}
+                                </Text>
+                                <Ionicons name="chevron-down" size={14} color={dimeTheme.colors.textPrimary} />
+                            </TouchableOpacity>
+                        </XStack>
+                        <TouchableOpacity style={styles.filterButton}>
+                            <Text color={dimeTheme.colors.primary} fontSize={12} fontWeight="600">
+                                P&L Filter
+                            </Text>
+                            <Ionicons name="filter" size={14} color={dimeTheme.colors.primary} />
+                        </TouchableOpacity>
                     </XStack>
 
-                    {/* Holdings List */}
-                    <YStack paddingHorizontal="$4" paddingBottom="$4">
-                        <XStack justifyContent="space-between" alignItems="center" marginBottom="$3">
-                            <Text color={dimeTheme.colors.textPrimary} fontSize="$5" fontWeight="bold">
-                                Holdings
-                            </Text>
-                            <Text color={dimeTheme.colors.primary} fontSize="$3">
-                                {MOCK_HOLDINGS.length} positions
-                            </Text>
-                        </XStack>
-
-                        {MOCK_HOLDINGS.length > 0 ? (
-                            MOCK_HOLDINGS.map(holding => (
-                                <HoldingCard
+                    {/* Stocks Section */}
+                    {showStocks && sortedHoldings.length > 0 && (
+                        <>
+                            <XStack paddingHorizontal="$4" paddingBottom="$2" justifyContent="space-between">
+                                <Text color={dimeTheme.colors.textTertiary} fontSize={11}>
+                                    {sortedHoldings.length} Stocks
+                                </Text>
+                                <XStack gap="$4">
+                                    <Text color={dimeTheme.colors.textTertiary} fontSize={11}>Value (USD)</Text>
+                                    <Text color={dimeTheme.colors.textTertiary} fontSize={11}>P&L %</Text>
+                                </XStack>
+                            </XStack>
+                            {sortedHoldings.map((holding) => (
+                                <HoldingItem
                                     key={holding.symbol}
                                     symbol={holding.symbol}
                                     name={holding.name}
+                                    logoUrl={holding.logoUrl}
                                     quantity={holding.quantity}
                                     avgCost={holding.avgCost}
-                                    currentPrice={quotes[holding.symbol]?.price ?? holding.currentPrice}
+                                    currentPrice={holding.currentPrice}
+                                    allocation={holding.allocation}
+                                    onPress={() => router.push(`/(tabs)/market/${encodeURIComponent(holding.symbol)}`)}
                                 />
-                            ))
-                        ) : (
-                            <View style={styles.emptyState}>
-                                <Text color={dimeTheme.colors.textTertiary} textAlign="center" fontSize="$4">
-                                    No positions yet
+                            ))}
+                        </>
+                    )}
+
+                    {/* Options Section */}
+                    {showOptions && MOCK_OPTIONS.length > 0 && (
+                        <>
+                            <XStack paddingHorizontal="$4" paddingTop="$3" paddingBottom="$2">
+                                <Text color={dimeTheme.colors.textTertiary} fontSize={11}>
+                                    {MOCK_OPTIONS.length} Options
                                 </Text>
-                                <Text color={dimeTheme.colors.textSecondary} fontSize="$2" textAlign="center" marginTop="$2">
-                                    Start trading to build your portfolio!
-                                </Text>
-                            </View>
-                        )}
-                    </YStack>
+                            </XStack>
+                            {MOCK_OPTIONS.map((option, index) => (
+                                <OptionItem
+                                    key={`${option.symbol}-${option.type}-${index}`}
+                                    symbol={option.symbol}
+                                    name={option.name}
+                                    logoUrl={option.logoUrl}
+                                    type={option.type}
+                                    strike={option.strike}
+                                    expiry={option.expiry}
+                                    contracts={option.contracts}
+                                    premium={option.premium}
+                                    currentPrice={option.currentPrice}
+                                    delta={option.delta}
+                                />
+                            ))}
+                        </>
+                    )}
+
+                    {/* Bottom padding */}
+                    <View style={{ height: 120 }} />
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -137,25 +282,39 @@ const styles = StyleSheet.create({
     safeArea: {
         flex: 1,
     },
-    valueCard: {
-        padding: 20,
-        borderRadius: dimeTheme.radius.xl,
-        borderWidth: 1,
-        borderColor: dimeTheme.colors.border,
+    tabsContainer: {
+        paddingHorizontal: 16,
+        paddingBottom: 12,
+        gap: 8,
     },
-    summaryCard: {
-        flex: 1,
+    tabButton: {
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 20,
         backgroundColor: dimeTheme.colors.surface,
-        padding: 16,
-        borderRadius: dimeTheme.radius.lg,
         borderWidth: 1,
         borderColor: dimeTheme.colors.border,
+        marginRight: 8,
+        minHeight: 36,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
-    emptyState: {
+    tabButtonActive: {
+        backgroundColor: 'transparent',
+        borderWidth: 1.5,
+    },
+    sortButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
         backgroundColor: dimeTheme.colors.surface,
-        padding: 32,
-        borderRadius: dimeTheme.radius.lg,
-        borderWidth: 1,
-        borderColor: dimeTheme.colors.border,
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    filterButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
     },
 })
