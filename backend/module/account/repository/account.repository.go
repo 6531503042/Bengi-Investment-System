@@ -125,3 +125,32 @@ func (r *AccountRepository) GetTransactionsByAccountID(ctx context.Context, acco
 	}
 	return transactions, nil
 }
+
+// UpdateField updates a single field on an account
+func (r *AccountRepository) UpdateField(ctx context.Context, accountID primitive.ObjectID, field string, value interface{}) error {
+	_, err := r.accountCollection.UpdateByID(ctx, accountID, bson.M{
+		"$set": bson.M{
+			field:       value,
+			"updatedAt": time.Now(),
+		},
+	})
+	return err
+}
+
+// FindDemoByUserID finds demo account for a user
+func (r *AccountRepository) FindDemoByUserID(ctx context.Context, userID string) (*model.Account, error) {
+	objectID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var account model.Account
+	err = r.accountCollection.FindOne(ctx, bson.M{
+		"userId": objectID,
+		"type":   model.AccountTypeDemo,
+	}).Decode(&account)
+	if err != nil {
+		return nil, err
+	}
+	return &account, nil
+}
