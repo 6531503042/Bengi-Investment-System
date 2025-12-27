@@ -2,7 +2,7 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig } from 'axio
 import * as SecureStore from 'expo-secure-store'
 import { API_CONFIG } from '@/constants'
 import type { User, LoginCredentials, RegisterData } from '@/types/auth'
-import type { Instrument, Quote } from '@/types/market'
+import type { Instrument, Quote, CandleData } from '@/types/market'
 import type { Portfolio, Account } from '@/types/portfolio'
 import type { Order, CreateOrderInput, Trade } from '@/types/trade'
 
@@ -83,19 +83,34 @@ export const authService = {
 
 // Instrument API
 export const instrumentService = {
-    getAll: async () => {
-        const { data } = await api.get<{ instruments: Instrument[] }>('/instruments')
-        return data.instruments
+    getAll: async (page: number = 1, limit: number = 50): Promise<{ instruments: Instrument[], total: number }> => {
+        const { data: response } = await api.get<ApiResponse<{ instruments: Instrument[], total: number }>>(`/instruments?page=${page}&limit=${limit}`)
+        return response.data
     },
 
-    search: async (query: string) => {
-        const { data } = await api.get<{ instruments: Instrument[] }>(`/instruments/search?q=${query}`)
-        return data.instruments
+    search: async (query: string, type?: string): Promise<{ instruments: Instrument[], total: number }> => {
+        let url = `/instruments/search?q=${query}`
+        if (type) url += `&type=${type}`
+        const { data: response } = await api.get<ApiResponse<{ instruments: Instrument[], total: number }>>(url)
+        return response.data
     },
 
-    getQuote: async (symbol: string) => {
-        const { data } = await api.get<Quote>(`/instruments/${symbol}/quote`)
-        return data
+    getBySymbol: async (symbol: string): Promise<Instrument> => {
+        const { data: response } = await api.get<ApiResponse<Instrument>>(`/instruments/${symbol}`)
+        return response.data
+    },
+
+    getQuote: async (symbol: string): Promise<Quote> => {
+        const { data: response } = await api.get<ApiResponse<Quote>>(`/instruments/${symbol}/quote`)
+        return response.data
+    },
+
+    getCandles: async (symbol: string, resolution: string = 'D', from?: number, to?: number): Promise<CandleData[]> => {
+        let url = `/instruments/${symbol}/candles?resolution=${resolution}`
+        if (from) url += `&from=${from}`
+        if (to) url += `&to=${to}`
+        const { data: response } = await api.get<ApiResponse<{ symbol: string; resolution: string; candles: CandleData[] }>>(url)
+        return response.data.candles
     },
 }
 
@@ -193,3 +208,45 @@ export const watchlistService = {
         return data
     },
 }
+
+// Demo Account API
+import type { DemoAccountStats, DemoDepositRequest, DemoDepositResponse, DemoResetRequest, DemoResetResponse, CreateDemoAccountRequest } from '@/types/demo'
+
+export const demoService = {
+    // Get or create demo account - auto-creates with $10,000 if none exists
+    getOrCreate: async (): Promise<DemoAccountStats> => {
+        const { data: response } = await api.get<ApiResponse<DemoAccountStats>>('/demo')
+        return response.data
+    },
+
+    // Create new demo account with custom settings
+    create: async (req?: CreateDemoAccountRequest): Promise<DemoAccountStats> => {
+        const { data: response } = await api.post<ApiResponse<DemoAccountStats>>('/demo', req || {})
+        return response.data
+    },
+
+    // Deposit virtual funds (unlimited!)
+    deposit: async (accountId: string, amount: number): Promise<DemoDepositResponse> => {
+        const { data: response } = await api.post<ApiResponse<DemoDepositResponse>>(
+            `/demo/${accountId}/deposit`,
+            { amount } as DemoDepositRequest
+        )
+        return response.data
+    },
+
+    // Reset demo account to initial state
+    reset: async (accountId: string, initialBalance?: number): Promise<DemoResetResponse> => {
+        const { data: response } = await api.post<ApiResponse<DemoResetResponse>>(
+            `/demo/${accountId}/reset`,
+            { initialBalance } as DemoResetRequest
+        )
+        return response.data
+    },
+
+    // Get demo account statistics
+    getStats: async (accountId: string): Promise<DemoAccountStats> => {
+        const { data: response } = await api.get<ApiResponse<DemoAccountStats>>(`/demo/${accountId}/stats`)
+        return response.data
+    },
+}
+
