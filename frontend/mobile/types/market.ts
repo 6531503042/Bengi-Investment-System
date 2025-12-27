@@ -9,15 +9,23 @@ export interface Quote {
     open: number
     previousClose: number
     volume: number
-    timestamp: number
+    timestamp: number | string
 }
 
+export type InstrumentType = 'Stock' | 'ETF' | 'Crypto' | 'Future' | 'Option'
+
 export interface Instrument {
+    id: string
     symbol: string
     name: string
-    type: 'stock' | 'crypto' | 'forex'
+    type: InstrumentType
     exchange: string
     currency: string
+    status: string
+    description?: string
+    logoUrl?: string
+    createdAt?: string
+    updatedAt?: string
 }
 
 export interface MarketState {
@@ -27,3 +35,13 @@ export interface MarketState {
     isLoading: boolean
     wsConnected: boolean
 }
+
+export interface CandleData {
+    time: number
+    open: number
+    high: number
+    low: number
+    close: number
+    volume: number
+}
+

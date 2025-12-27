@@ -22,8 +22,8 @@ export const useMarketStore = create<MarketState & MarketActions>((set, get) => 
     fetchInstruments: async () => {
         set({ isLoading: true })
         try {
-            const instruments = await instrumentService.getAll()
-            set({ instruments, isLoading: false })
+            const result = await instrumentService.getAll()
+            set({ instruments: result.instruments ?? [], isLoading: false })
         } catch (error) {
             console.error('Failed to fetch instruments:', error)
             set({ isLoading: false })
