@@ -55,8 +55,11 @@ func (ctrl *AuthController) Login(c *fiber.Ctx) error {
 	}
 
 	utils.SetAuthCookies(c, result.AccessToken, result.RefreshToken)
+	// Return tokens in body for mobile app compatibility
 	return common.Success(c, fiber.Map{
-		"user": result.User,
+		"accessToken":  result.AccessToken,
+		"refreshToken": result.RefreshToken,
+		"user":         result.User,
 	}, "Login successful")
 }
 
