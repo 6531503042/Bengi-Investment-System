@@ -78,5 +78,9 @@ func RunSeeders() {
 		log.Printf("❌ Failed to seed roles: %v", err)
 	}
 
+	if err := SeedInstruments(ctx); err != nil {
+		log.Printf("❌ Failed to seed instruments: %v", err)
+	}
+
 	log.Println("🌱 Seeders completed")
 }
