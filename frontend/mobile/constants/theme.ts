@@ -19,8 +19,8 @@ export const dimeTheme = {
 
         // Text
         textPrimary: '#FFFFFF',
-        textSecondary: '#8E8E93',
-        textTertiary: '#636366',
+        textSecondary: '#A8A8AD',  // Lighter gray for better readability
+        textTertiary: '#8A8A8E',   // Lighter tertiary for visibility
 
         // Border
         border: '#2C2C2E',
