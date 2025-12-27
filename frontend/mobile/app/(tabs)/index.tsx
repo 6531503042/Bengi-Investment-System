@@ -4,31 +4,29 @@ import { YStack, XStack, Text, View, Button } from 'tamagui'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useRouter } from 'expo-router'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { usePortfolioStore } from '@/stores/portfolio'
 import { useMarketStore } from '@/stores/market'
 import { useAuthStore } from '@/stores/auth'
+import { useDemoStore } from '@/stores/demo'
 import { dimeTheme } from '@/constants/theme'
 import { PriceChip } from '@/components/common/PriceChip'
-import type { Portfolio, Account } from '@/types/portfolio'
+import { Ionicons } from '@expo/vector-icons'
 
 export default function HomeScreen() {
   const router = useRouter()
   const { user } = useAuthStore()
-  const { portfolios = [], accounts = [], fetchPortfolios, fetchAccounts } = usePortfolioStore()
   const { wsConnected } = useMarketStore()
+  const { account: demoAccount, isLoading, fetchDemo } = useDemoStore()
 
   useEffect(() => {
-    fetchPortfolios()
-    fetchAccounts()
+    fetchDemo()
   }, [])
 
-  const safePortfolios = portfolios ?? []
-  const safeAccounts = accounts ?? []
-
-  const totalValue = safePortfolios.reduce((sum: number, p: Portfolio) => sum + (p.totalValue ?? 0), 0)
-  const totalPL = safePortfolios.reduce((sum: number, p: Portfolio) => sum + (p.totalPL ?? 0), 0)
-  const totalPLPercent = totalValue > 0 ? (totalPL / totalValue) * 100 : 0
-  const cashBalance = safeAccounts.reduce((sum: number, a: Account) => sum + (a.balance ?? 0), 0)
+  // Use demo account balance instead of portfolio
+  const balance = demoAccount?.balance ?? 0
+  const initialBalance = demoAccount?.initialBalance ?? 10000
+  const pnl = balance - initialBalance
+  const pnlPercent = demoAccount?.pnlPercentage ?? 0
+  const leverage = demoAccount?.leverage ?? 10
 
   return (
     <View style={styles.container}>
@@ -46,15 +44,17 @@ export default function HomeScreen() {
               </Text>
             </YStack>
             <XStack alignItems="center" gap="$2">
+              <View style={styles.demoBadge}>
+                <Text color={dimeTheme.colors.primary} fontSize="$1" fontWeight="bold">
+                  DEMO
+                </Text>
+              </View>
               <View
                 width={10}
                 height={10}
                 borderRadius={5}
-                backgroundColor={wsConnected ? dimeTheme.colors.profit : dimeTheme.colors.loss}
+                backgroundColor={wsConnected ? dimeTheme.colors.profit : dimeTheme.colors.textTertiary}
               />
-              <Text color={wsConnected ? dimeTheme.colors.profit : dimeTheme.colors.loss} fontSize="$2">
-                {wsConnected ? 'Live' : 'Offline'}
-              </Text>
             </XStack>
           </XStack>
 
@@ -67,15 +67,15 @@ export default function HomeScreen() {
               style={styles.portfolioCard}
             >
               <Text color={dimeTheme.colors.textSecondary} fontSize="$3" marginBottom="$2">
-                Total Portfolio Value
+                Demo Account Balance
               </Text>
               <Text color={dimeTheme.colors.textPrimary} fontSize="$10" fontWeight="bold">
-                ${totalValue.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
               </Text>
               <XStack marginTop="$3" alignItems="center" gap="$2">
-                <PriceChip value={totalPLPercent} size="md" />
+                <PriceChip value={pnlPercent} size="md" />
                 <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
-                  {totalPL >= 0 ? '+' : ''}${totalPL.toFixed(2)} today
+                  {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} total P&L
                 </Text>
               </XStack>
             </LinearGradient>
@@ -84,19 +84,36 @@ export default function HomeScreen() {
           {/* Quick Stats */}
           <XStack paddingHorizontal="$4" gap="$3" marginBottom="$4">
             <View style={styles.statCard}>
-              <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
-                Cash Balance
-              </Text>
+              <XStack alignItems="center" gap="$2" marginBottom="$1">
+                <Ionicons name="trending-up" size={16} color={dimeTheme.colors.primary} />
+                <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
+                  Leverage
+                </Text>
+              </XStack>
               <Text color={dimeTheme.colors.textPrimary} fontSize="$5" fontWeight="bold">
-                ${cashBalance.toFixed(2)}
+                {leverage}x
               </Text>
             </View>
             <View style={styles.statCard}>
-              <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
-                Positions
-              </Text>
+              <XStack alignItems="center" gap="$2" marginBottom="$1">
+                <Ionicons name="wallet-outline" size={16} color={dimeTheme.colors.primary} />
+                <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
+                  Initial
+                </Text>
+              </XStack>
               <Text color={dimeTheme.colors.textPrimary} fontSize="$5" fontWeight="bold">
-                {safePortfolios.reduce((sum, p) => sum + (p.positions?.length ?? 0), 0)}
+                ${initialBalance.toLocaleString()}
+              </Text>
+            </View>
+            <View style={styles.statCard}>
+              <XStack alignItems="center" gap="$2" marginBottom="$1">
+                <Ionicons name="analytics-outline" size={16} color={dimeTheme.colors.primary} />
+                <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
+                  Positions
+                </Text>
+              </XStack>
+              <Text color={dimeTheme.colors.textPrimary} fontSize="$5" fontWeight="bold">
+                0
               </Text>
             </View>
           </XStack>
@@ -114,37 +131,43 @@ export default function HomeScreen() {
                 pressStyle={{ backgroundColor: dimeTheme.colors.primaryDark }}
                 onPress={() => router.push('/(tabs)/market/index')}
               >
-                <Text color={dimeTheme.colors.background} fontWeight="bold">
-                  Browse Market
-                </Text>
+                <XStack alignItems="center" gap="$2">
+                  <Ionicons name="search" size={18} color={dimeTheme.colors.background} />
+                  <Text color={dimeTheme.colors.background} fontWeight="bold">
+                    Market
+                  </Text>
+                </XStack>
               </Button>
               <Button
                 flex={1}
                 size="$5"
                 backgroundColor={dimeTheme.colors.surface}
                 borderWidth={1}
-                borderColor={dimeTheme.colors.primary}
+                borderColor={dimeTheme.colors.profit}
                 pressStyle={{ backgroundColor: dimeTheme.colors.backgroundSecondary }}
                 onPress={() => router.push('/trade')}
               >
-                <Text color={dimeTheme.colors.primary} fontWeight="bold">
-                  Place Order
-                </Text>
+                <XStack alignItems="center" gap="$2">
+                  <Ionicons name="swap-vertical" size={18} color={dimeTheme.colors.profit} />
+                  <Text color={dimeTheme.colors.profit} fontWeight="bold">
+                    Trade
+                  </Text>
+                </XStack>
               </Button>
             </XStack>
           </YStack>
 
-          {/* Recent Activity */}
+          {/* Demo Info */}
           <YStack paddingHorizontal="$4" paddingBottom="$4">
-            <Text color={dimeTheme.colors.textPrimary} fontSize="$5" fontWeight="bold" marginBottom="$3">
-              Recent Activity
-            </Text>
-            <View style={styles.emptyCard}>
-              <Text color={dimeTheme.colors.textTertiary} textAlign="center">
-                No recent activity
-              </Text>
-              <Text color={dimeTheme.colors.textSecondary} fontSize="$2" textAlign="center" marginTop="$1">
-                Start trading to see your activity here
+            <View style={styles.infoCard}>
+              <XStack alignItems="center" gap="$2" marginBottom="$2">
+                <Ionicons name="information-circle" size={20} color={dimeTheme.colors.primary} />
+                <Text color={dimeTheme.colors.textPrimary} fontWeight="600">
+                  Demo Trading Mode
+                </Text>
+              </XStack>
+              <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
+                Trade with virtual funds. Your demo balance can be reset or topped up anytime from your Profile.
               </Text>
             </View>
           </YStack>
@@ -168,17 +191,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: dimeTheme.colors.border,
   },
+  demoBadge: {
+    backgroundColor: 'rgba(0, 230, 118, 0.15)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: dimeTheme.colors.primary,
+  },
   statCard: {
     flex: 1,
     backgroundColor: dimeTheme.colors.surface,
-    padding: 16,
+    padding: 12,
     borderRadius: dimeTheme.radius.lg,
     borderWidth: 1,
     borderColor: dimeTheme.colors.border,
   },
-  emptyCard: {
+  infoCard: {
     backgroundColor: dimeTheme.colors.surface,
-    padding: 24,
+    padding: 16,
     borderRadius: dimeTheme.radius.lg,
     borderWidth: 1,
     borderColor: dimeTheme.colors.border,
