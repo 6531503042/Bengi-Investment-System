@@ -44,4 +44,21 @@ type (
 		Page     int    `query:"page"`
 		Limit    int    `query:"limit"`
 	}
+
+	// CandleData represents a single candlestick data point
+	CandleData struct {
+		Time   int64   `json:"time"` // Unix timestamp
+		Open   float64 `json:"open"`
+		High   float64 `json:"high"`
+		Low    float64 `json:"low"`
+		Close  float64 `json:"close"`
+		Volume int64   `json:"volume"`
+	}
+
+	// CandleResponse is the response for historical candle data
+	CandleResponse struct {
+		Symbol     string       `json:"symbol"`
+		Resolution string       `json:"resolution"`
+		Candles    []CandleData `json:"candles"`
+	}
 )

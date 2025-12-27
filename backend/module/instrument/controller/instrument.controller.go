@@ -2,6 +2,8 @@ package controller
 
 import (
 	"errors"
+	"net/url"
+	"time"
 
 	"github.com/bricksocoolxd/bengi-investment-system/module/instrument/dto"
 	"github.com/bricksocoolxd/bengi-investment-system/module/instrument/service"
@@ -56,7 +58,7 @@ func (ctrl *InstrumentController) SearchInstruments(c *fiber.Ctx) error {
 // GetInstrumentBySymbol returns a single instrument
 // GET /api/v1/instruments/:symbol
 func (ctrl *InstrumentController) GetInstrumentBySymbol(c *fiber.Ctx) error {
-	symbol := c.Params("symbol")
+	symbol, _ := url.PathUnescape(c.Params("symbol"))
 
 	result, err := ctrl.instrumentService.GetInstrumentBySymbol(c.Context(), symbol)
 	if err != nil {
@@ -72,7 +74,7 @@ func (ctrl *InstrumentController) GetInstrumentBySymbol(c *fiber.Ctx) error {
 // GetQuote returns real-time quote for a symbol
 // GET /api/v1/instruments/:symbol/quote
 func (ctrl *InstrumentController) GetQuote(c *fiber.Ctx) error {
-	symbol := c.Params("symbol")
+	symbol, _ := url.PathUnescape(c.Params("symbol"))
 
 	result, err := ctrl.instrumentService.GetQuote(c.Context(), symbol)
 	if err != nil {
@@ -81,6 +83,37 @@ func (ctrl *InstrumentController) GetQuote(c *fiber.Ctx) error {
 		}
 		if errors.Is(err, service.ErrQuoteNotFound) || errors.Is(err, service.ErrAPIError) {
 			return common.InternalError(c, "Unable to fetch quote")
+		}
+		return common.InternalError(c, err.Error())
+	}
+
+	return common.Success(c, result, "")
+}
+
+// GetCandles returns historical candlestick data for a symbol
+// GET /api/v1/instruments/:symbol/candles?resolution=D&from=1234567890&to=1234567890
+func (ctrl *InstrumentController) GetCandles(c *fiber.Ctx) error {
+	symbol, _ := url.PathUnescape(c.Params("symbol"))
+	resolution := c.Query("resolution", "D") // Default to daily
+	from := c.QueryInt("from", 0)
+	to := c.QueryInt("to", 0)
+
+	// Default to last 30 days if no time range specified
+	now := time.Now().Unix()
+	if from == 0 {
+		from = int(now) - (30 * 24 * 60 * 60) // 30 days ago
+	}
+	if to == 0 {
+		to = int(now)
+	}
+
+	result, err := ctrl.instrumentService.GetCandles(c.Context(), symbol, resolution, int64(from), int64(to))
+	if err != nil {
+		if errors.Is(err, service.ErrInstrumentNotFound) {
+			return common.NotFound(c, "Instrument not found")
+		}
+		if errors.Is(err, service.ErrQuoteNotFound) {
+			return common.NotFound(c, "No candle data available")
 		}
 		return common.InternalError(c, err.Error())
 	}

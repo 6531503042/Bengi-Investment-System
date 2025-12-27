@@ -23,6 +23,7 @@ func RegisterRoutes(app *fiber.App) {
 	instruments.Get("/search", ctrl.SearchInstruments)
 	instruments.Get("/:symbol", ctrl.GetInstrumentBySymbol)
 	instruments.Get("/:symbol/quote", ctrl.GetQuote)
+	instruments.Get("/:symbol/candles", ctrl.GetCandles)
 
 	// Admin routes (auth + admin role required)
 	admin := instruments.Group("", middleware.AuthRequired(), middleware.RoleRequired(model.RoleAdmin))

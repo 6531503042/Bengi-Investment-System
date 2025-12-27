@@ -144,6 +144,40 @@ func (s *InstrumentService) GetQuote(ctx context.Context, symbol string) (*dto.Q
 	return s.toQuoteResponse(quote), nil
 }
 
+// GetCandles returns historical candlestick data for a symbol
+// resolution: 1, 5, 15, 30, 60 (minutes) or D (day), W (week), M (month)
+func (s *InstrumentService) GetCandles(ctx context.Context, symbol, resolution string, from, to int64) (*dto.CandleResponse, error) {
+	// Verify instrument exists
+	_, err := s.repository.FindBySymbol(ctx, symbol)
+	if err != nil {
+		return nil, ErrInstrumentNotFound
+	}
+
+	candles, err := s.MarketDataService.GetCandles(symbol, resolution, from, to)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to response format
+	candleData := make([]dto.CandleData, len(candles))
+	for i, c := range candles {
+		candleData[i] = dto.CandleData{
+			Time:   c.Time,
+			Open:   c.Open,
+			High:   c.High,
+			Low:    c.Low,
+			Close:  c.Close,
+			Volume: c.Volume,
+		}
+	}
+
+	return &dto.CandleResponse{
+		Symbol:     symbol,
+		Resolution: resolution,
+		Candles:    candleData,
+	}, nil
+}
+
 // UpdateInstrument updates an instrument (admin only)
 func (s *InstrumentService) UpdateInstrument(ctx context.Context, symbol string, req *dto.UpdateInstrumentRequest) (*dto.InstrumentResponse, error) {
 	instrument, err := s.repository.FindBySymbol(ctx, symbol)
