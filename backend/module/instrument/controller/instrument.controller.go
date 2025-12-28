@@ -22,11 +22,29 @@ func NewInstrumentController(instrumentService *service.InstrumentService) *Inst
 	}
 }
 
-// GetInstruments returns paginated list of instruments
-// GET /api/v1/instruments
+// GetInstruments returns paginated list of instruments with optional search
+// GET /api/v1/instruments?page=1&limit=20&search=AAPL&type=Stock
 func (ctrl *InstrumentController) GetInstruments(c *fiber.Ctx) error {
 	page := c.QueryInt("page", 1)
-	limit := c.QueryInt("limit", 20)
+	limit := c.QueryInt("limit", 100)
+	search := c.Query("search")
+	instrumentType := c.Query("type")
+
+	// If search or type filter is provided, use search function
+	if search != "" || instrumentType != "" {
+		query := &dto.SearchQuery{
+			Query:    search,
+			Type:     instrumentType,
+			Exchange: c.Query("exchange"),
+			Page:     page,
+			Limit:    limit,
+		}
+		result, err := ctrl.instrumentService.SearchInstruments(c.Context(), query)
+		if err != nil {
+			return common.InternalError(c, err.Error())
+		}
+		return common.Success(c, result, "")
+	}
 
 	result, err := ctrl.instrumentService.GetInstruments(c.Context(), page, limit)
 	if err != nil {
