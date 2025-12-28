@@ -1,11 +1,15 @@
 package main
 
 import (
+	"context"
 	"log"
+	"time"
 
 	accountRoutes "github.com/bricksocoolxd/bengi-investment-system/module/account/routes"
 	authRoutes "github.com/bricksocoolxd/bengi-investment-system/module/auth/routes"
+	"github.com/bricksocoolxd/bengi-investment-system/module/instrument/repository"
 	instrumentRoutes "github.com/bricksocoolxd/bengi-investment-system/module/instrument/routes"
+	"github.com/bricksocoolxd/bengi-investment-system/module/instrument/service"
 	orderRoutes "github.com/bricksocoolxd/bengi-investment-system/module/order/routes"
 	portfolioRoutes "github.com/bricksocoolxd/bengi-investment-system/module/portfolio/routes"
 	tradeRoutes "github.com/bricksocoolxd/bengi-investment-system/module/trade/routes"
@@ -32,6 +36,15 @@ func main() {
 
 	// Run seeders (create default roles, etc.)
 	seeder.RunSeeders()
+
+	// Start Symbol Sync Service (fetches all stocks/ETFs/crypto from Finnhub)
+	instrumentRepo := repository.NewInstrumentRepository()
+	symbolSyncService := service.NewSymbolSyncService(instrumentRepo)
+	ctx := context.Background()
+
+	// Start periodic sync (every 24 hours)
+	go symbolSyncService.StartPeriodicSync(ctx, 24*time.Hour)
+	log.Println("📈 Symbol Sync Service started (syncs all instruments from Finnhub)")
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
