@@ -147,3 +147,61 @@ func (r *InstrumentRepository) SymbolExists(ctx context.Context, symbol string) 
 	}
 	return count > 0, nil
 }
+
+// BulkUpsertInstruments inserts new instruments or updates existing ones (by symbol)
+func (r *InstrumentRepository) BulkUpsertInstruments(ctx context.Context, instruments []*model.Instrument) (int64, int64, error) {
+	if len(instruments) == 0 {
+		return 0, 0, nil
+	}
+
+	var inserted, updated int64
+
+	// Use MongoDB's BulkWrite for efficiency
+	var operations []mongo.WriteModel
+
+	for _, inst := range instruments {
+		filter := bson.M{"symbol": inst.Symbol}
+		update := bson.M{
+			"$set": bson.M{
+				"name":        inst.Name,
+				"type":        inst.Type,
+				"logoUrl":     inst.LogoURL,
+				"description": inst.Description,
+				"status":      model.InstrumentStatusActive,
+				"updatedAt":   time.Now(),
+			},
+			"$setOnInsert": bson.M{
+				"createdAt": time.Now(),
+			},
+		}
+
+		op := mongo.NewUpdateOneModel().
+			SetFilter(filter).
+			SetUpdate(update).
+			SetUpsert(true)
+
+		operations = append(operations, op)
+	}
+
+	// Execute in batches of 1000
+	batchSize := 1000
+	for i := 0; i < len(operations); i += batchSize {
+		end := i + batchSize
+		if end > len(operations) {
+			end = len(operations)
+		}
+
+		batch := operations[i:end]
+		opts := options.BulkWrite().SetOrdered(false)
+
+		result, err := r.collection.BulkWrite(ctx, batch, opts)
+		if err != nil {
+			return inserted, updated, err
+		}
+
+		inserted += result.UpsertedCount
+		updated += result.ModifiedCount
+	}
+
+	return inserted, updated, nil
+}
