@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { StyleSheet, FlatList, StatusBar, TextInput, Image, RefreshControl, TouchableOpacity } from 'react-native'
+import { StyleSheet, FlatList, StatusBar, TextInput, Image, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { YStack, XStack, Text, View, Spinner } from 'tamagui'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
@@ -18,29 +18,72 @@ const CATEGORIES: Array<{ key: 'All' | InstrumentType; label: string; icon: stri
 
 export default function MarketScreen() {
     const router = useRouter()
-    const { instruments, fetchInstruments, isLoading } = useMarketStore()
+    const {
+        instruments,
+        fetchInstruments,
+        loadMore,
+        isLoading,
+        isLoadingMore,
+        pagination,
+        searchResults,
+        searchInstruments
+    } = useMarketStore()
     const [searchQuery, setSearchQuery] = useState('')
     const [activeCategory, setActiveCategory] = useState<'All' | InstrumentType>('All')
     const [refreshing, setRefreshing] = useState(false)
+    const [debouncedSearch, setDebouncedSearch] = useState('')
 
     useEffect(() => {
-        fetchInstruments()
+        fetchInstruments(true)
     }, [])
+
+    // Debounce search input (300ms)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchQuery)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [searchQuery])
+
+    // Call API when debounced search changes
+    useEffect(() => {
+        if (debouncedSearch.trim().length >= 2) {
+            searchInstruments(debouncedSearch, activeCategory === 'All' ? undefined : activeCategory)
+        }
+    }, [debouncedSearch, activeCategory])
 
     const onRefresh = useCallback(async () => {
         setRefreshing(true)
-        await fetchInstruments()
+        await fetchInstruments(true)
         setRefreshing(false)
     }, [])
 
-    // Filter instruments
-    const filteredInstruments = instruments.filter(instrument => {
-        const matchesSearch =
-            instrument.symbol.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            instrument.name.toLowerCase().includes(searchQuery.toLowerCase())
-        const matchesCategory = activeCategory === 'All' || instrument.type === activeCategory
-        return matchesSearch && matchesCategory
-    })
+    const onEndReached = useCallback(() => {
+        if (!searchQuery && activeCategory === 'All') {
+            loadMore()
+        }
+    }, [searchQuery, activeCategory, loadMore])
+
+    // Use search results if searching, otherwise filter local data
+    const displayInstruments = debouncedSearch.trim().length >= 2
+        ? searchResults.filter(i => activeCategory === 'All' || i.type === activeCategory)
+        : instruments.filter(instrument => {
+            const matchesCategory = activeCategory === 'All' || instrument.type === activeCategory
+            return matchesCategory
+        })
+
+    // Footer component for loading indicator
+    const renderFooter = () => {
+        if (!isLoadingMore) return null
+        return (
+            <View style={styles.footerLoader}>
+                <ActivityIndicator size="small" color={dimeTheme.colors.primary} />
+                <Text color={dimeTheme.colors.textSecondary} fontSize={12} marginLeft="$2">
+                    Loading more...
+                </Text>
+            </View>
+        )
+    }
 
     const getTypeColor = (type: InstrumentType) => {
         switch (type) {
@@ -112,7 +155,7 @@ export default function MarketScreen() {
                         Market
                     </Text>
                     <Text color={dimeTheme.colors.textSecondary} fontSize={13}>
-                        {instruments.length} instruments
+                        {pagination.total > 0 ? pagination.total.toLocaleString() : instruments.length} instruments
                     </Text>
                 </View>
 
@@ -168,11 +211,14 @@ export default function MarketScreen() {
                     </View>
                 ) : (
                     <FlatList
-                        data={filteredInstruments}
+                        data={displayInstruments}
                         renderItem={renderInstrument}
                         keyExtractor={item => item.id}
                         contentContainerStyle={styles.listContent}
                         showsVerticalScrollIndicator={false}
+                        onEndReached={onEndReached}
+                        onEndReachedThreshold={0.5}
+                        ListFooterComponent={renderFooter}
                         refreshControl={
                             <RefreshControl
                                 refreshing={refreshing}
@@ -300,5 +346,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingTop: 100,
+    },
+    footerLoader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 20,
     },
 })
