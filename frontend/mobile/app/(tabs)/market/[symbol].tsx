@@ -14,11 +14,14 @@ import type { CandleData, Instrument, Quote } from '@/types/market'
 const { width: screenWidth } = Dimensions.get('window')
 
 // Time period options with their resolution and days
+// Yahoo Finance free: Daily data only (no intraday for free tier)
 const TIME_PERIODS = [
-    { label: '1W', resolution: '60', days: 7 },
+    { label: '1W', resolution: 'D', days: 7 },       // Daily for 1 week
     { label: '1M', resolution: 'D', days: 30 },
     { label: '3M', resolution: 'D', days: 90 },
     { label: '1Y', resolution: 'D', days: 365 },
+    { label: '5Y', resolution: 'W', days: 365 * 5 },  // Weekly for 5 years
+    { label: 'ALL', resolution: 'M', days: 365 * 20 }, // Monthly for max
 ] as const
 
 type TimePeriod = typeof TIME_PERIODS[number]['label']
