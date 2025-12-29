@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { StyleSheet, ScrollView, StatusBar, Alert } from 'react-native'
+import { StyleSheet, ScrollView, StatusBar, Alert, TouchableOpacity } from 'react-native'
 import { YStack, XStack, Text, View, Button } from 'tamagui'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useAuthStore } from '@/stores/auth'
@@ -61,14 +61,59 @@ export default function ProfileScreen() {
         )
     }
 
-    const menuItems = [
-        { icon: 'person-outline', label: 'Account Settings', value: '' },
-        { icon: 'notifications-outline', label: 'Notifications', value: 'On' },
-        { icon: 'moon-outline', label: 'Theme', value: 'Dark' },
-        { icon: 'shield-checkmark-outline', label: 'Security', value: '' },
-        { icon: 'help-circle-outline', label: 'Help & Support', value: '' },
-        { icon: 'document-text-outline', label: 'Terms & Privacy', value: '' },
+    // Settings sections with organized categories
+    const settingsSections = [
+        {
+            title: 'Account',
+            items: [
+                { icon: 'person-outline', label: 'Edit Profile', value: '', hasArrow: true },
+                { icon: 'mail-outline', label: 'Email', value: user?.email ?? 'Not set', hasArrow: true },
+                { icon: 'key-outline', label: 'Change Password', value: '', hasArrow: true },
+                { icon: 'card-outline', label: 'Payment Methods', value: '', hasArrow: true },
+            ]
+        },
+        {
+            title: 'Preferences',
+            items: [
+                { icon: 'moon-outline', label: 'Dark Mode', value: 'On', isToggle: true, toggleValue: true },
+                { icon: 'globe-outline', label: 'Language', value: 'English', hasArrow: true },
+                { icon: 'cash-outline', label: 'Currency', value: 'USD', hasArrow: true },
+                { icon: 'notifications-outline', label: 'Push Notifications', value: '', isToggle: true, toggleValue: true },
+                { icon: 'mail-unread-outline', label: 'Email Alerts', value: '', isToggle: true, toggleValue: false },
+            ]
+        },
+        {
+            title: 'Trading',
+            items: [
+                { icon: 'trending-up-outline', label: 'Default Leverage', value: `${demoAccount?.leverage ?? 1}x`, hasArrow: true },
+                { icon: 'analytics-outline', label: 'Chart Style', value: 'Candles', hasArrow: true },
+                { icon: 'timer-outline', label: 'Default Timeframe', value: '1D', hasArrow: true },
+                { icon: 'warning-outline', label: 'Risk Management', value: '', hasArrow: true },
+            ]
+        },
+        {
+            title: 'Security',
+            items: [
+                { icon: 'finger-print-outline', label: 'Face ID / Touch ID', value: '', isToggle: true, toggleValue: true },
+                { icon: 'lock-closed-outline', label: 'App Lock PIN', value: '', hasArrow: true },
+                { icon: 'shield-checkmark-outline', label: 'Two-Factor Auth', value: 'Enabled', hasArrow: true },
+                { icon: 'eye-off-outline', label: 'Hide Balances', value: '', isToggle: true, toggleValue: false },
+            ]
+        },
+        {
+            title: 'Support',
+            items: [
+                { icon: 'help-circle-outline', label: 'Help Center', value: '', hasArrow: true },
+                { icon: 'chatbubble-outline', label: 'Contact Support', value: '', hasArrow: true },
+                { icon: 'document-text-outline', label: 'Terms of Service', value: '', hasArrow: true },
+                { icon: 'shield-outline', label: 'Privacy Policy', value: '', hasArrow: true },
+                { icon: 'information-circle-outline', label: 'About', value: 'v1.0.0', hasArrow: true },
+            ]
+        }
     ]
+
+    // For backward compatibility with existing render code
+    const menuItems = settingsSections.flatMap(s => s.items)
 
     return (
         <View style={styles.container}>
@@ -192,49 +237,65 @@ export default function ProfileScreen() {
                         </YStack>
                     )}
 
-                    {/* Menu Items */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
-                        <Text color={dimeTheme.colors.textPrimary} fontSize="$5" fontWeight="bold" marginBottom="$3">
-                            Settings
-                        </Text>
-                        <View style={styles.menuCard}>
-                            {menuItems.map((item, index) => (
-                                <View key={item.label}>
-                                    <XStack
-                                        paddingVertical="$3"
-                                        alignItems="center"
-                                        justifyContent="space-between"
-                                    >
-                                        <XStack alignItems="center" gap="$3">
-                                            <Ionicons
-                                                name={item.icon as any}
-                                                size={22}
-                                                color={dimeTheme.colors.textSecondary}
-                                            />
-                                            <Text color={dimeTheme.colors.textPrimary} fontSize="$4">
-                                                {item.label}
-                                            </Text>
-                                        </XStack>
-                                        <XStack alignItems="center" gap="$2">
-                                            {item.value && (
-                                                <Text color={dimeTheme.colors.textTertiary} fontSize="$3">
-                                                    {item.value}
+                    {/* Settings Sections */}
+                    {settingsSections.map((section, sectionIndex) => (
+                        <YStack key={section.title} paddingHorizontal="$4" marginBottom="$4">
+                            <Text color={dimeTheme.colors.textSecondary} fontSize={12} fontWeight="600" marginBottom="$2" marginLeft="$1">
+                                {section.title.toUpperCase()}
+                            </Text>
+                            <View style={styles.menuCard}>
+                                {section.items.map((item, index) => (
+                                    <TouchableOpacity key={item.label} activeOpacity={0.7}>
+                                        <XStack
+                                            paddingVertical="$3"
+                                            alignItems="center"
+                                            justifyContent="space-between"
+                                        >
+                                            <XStack alignItems="center" gap="$3">
+                                                <View style={styles.settingIcon}>
+                                                    <Ionicons
+                                                        name={item.icon as any}
+                                                        size={20}
+                                                        color={dimeTheme.colors.textSecondary}
+                                                    />
+                                                </View>
+                                                <Text color={dimeTheme.colors.textPrimary} fontSize={15}>
+                                                    {item.label}
                                                 </Text>
-                                            )}
-                                            <Ionicons
-                                                name="chevron-forward"
-                                                size={18}
-                                                color={dimeTheme.colors.textTertiary}
-                                            />
+                                            </XStack>
+                                            <XStack alignItems="center" gap="$2">
+                                                {item.value && !item.isToggle && (
+                                                    <Text color={dimeTheme.colors.textTertiary} fontSize={13}>
+                                                        {item.value}
+                                                    </Text>
+                                                )}
+                                                {item.isToggle ? (
+                                                    <View style={[
+                                                        styles.toggleSwitch,
+                                                        item.toggleValue && styles.toggleSwitchOn
+                                                    ]}>
+                                                        <View style={[
+                                                            styles.toggleKnob,
+                                                            item.toggleValue && styles.toggleKnobOn
+                                                        ]} />
+                                                    </View>
+                                                ) : item.hasArrow && (
+                                                    <Ionicons
+                                                        name="chevron-forward"
+                                                        size={18}
+                                                        color={dimeTheme.colors.textTertiary}
+                                                    />
+                                                )}
+                                            </XStack>
                                         </XStack>
-                                    </XStack>
-                                    {index < menuItems.length - 1 && (
-                                        <View style={styles.separator} />
-                                    )}
-                                </View>
-                            ))}
-                        </View>
-                    </YStack>
+                                        {index < section.items.length - 1 && (
+                                            <View style={styles.separator} />
+                                        )}
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                        </YStack>
+                    ))}
 
                     {/* App Info */}
                     <YStack paddingHorizontal="$4" marginBottom="$4">
@@ -264,8 +325,8 @@ export default function ProfileScreen() {
                         </Button>
                     </YStack>
                 </ScrollView>
-            </SafeAreaView>
-        </View>
+            </SafeAreaView >
+        </View >
     )
 }
 
@@ -330,5 +391,33 @@ const styles = StyleSheet.create({
         borderRadius: dimeTheme.radius.lg,
         borderWidth: 1,
         borderColor: dimeTheme.colors.border,
+    },
+    settingIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    toggleSwitch: {
+        width: 44,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: 'rgba(255, 255, 255, 0.1)',
+        padding: 2,
+        justifyContent: 'center',
+    },
+    toggleSwitchOn: {
+        backgroundColor: dimeTheme.colors.primary,
+    },
+    toggleKnob: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: '#fff',
+    },
+    toggleKnobOn: {
+        alignSelf: 'flex-end',
     },
 })
