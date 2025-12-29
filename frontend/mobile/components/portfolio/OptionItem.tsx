@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { StyleSheet, Image, TouchableOpacity } from 'react-native'
 import { Text, XStack, YStack, View } from 'tamagui'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
 import { dimeTheme } from '@/constants/theme'
 
@@ -10,15 +11,16 @@ interface OptionItemProps {
     logoUrl?: string
     type: 'Call' | 'Put'
     strike: number
-    expiry: string // e.g., "Jan 9, 2025"
+    expiry: string
     contracts: number
-    premium: number // Price paid per share
-    currentPrice: number // Current option price
+    premium: number
+    currentPrice: number
     delta?: number
+    theta?: number
+    iv?: number // Implied volatility
     onPress?: () => void
 }
 
-// Generate consistent color from symbol
 const getSymbolColor = (symbol: string): string => {
     const colors = ['#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#E91E63', '#00BCD4', '#FF5722', '#3F51B5']
     let hash = 0
@@ -39,6 +41,8 @@ export const OptionItem: React.FC<OptionItemProps> = ({
     premium,
     currentPrice,
     delta = 0,
+    theta = 0,
+    iv = 0,
     onPress,
 }) => {
     const [imageError, setImageError] = useState(false)
@@ -50,9 +54,15 @@ export const OptionItem: React.FC<OptionItemProps> = ({
     const pnlPercent = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
     const isProfit = pnlPercent >= 0
 
-    const typeColor = type === 'Call' ? dimeTheme.colors.profit : dimeTheme.colors.loss
+    const isCall = type === 'Call'
+    const typeColor = isCall ? '#00C853' : '#FF5252'
     const symbolColor = getSymbolColor(symbol)
     const showPlaceholder = !logoUrl || imageError
+
+    // Gradient based on option type
+    const gradientColors: readonly [string, string] = isCall
+        ? ['rgba(0, 200, 83, 0.08)', 'rgba(0, 200, 83, 0.02)']
+        : ['rgba(255, 82, 82, 0.08)', 'rgba(255, 82, 82, 0.02)']
 
     const formatUSD = (value: number) => {
         return new Intl.NumberFormat('en-US', {
@@ -62,149 +72,268 @@ export const OptionItem: React.FC<OptionItemProps> = ({
         }).format(value)
     }
 
+    // Calculate days until expiry
+    const getDaysUntilExpiry = () => {
+        const expiryDate = new Date(expiry)
+        const today = new Date()
+        const diffTime = expiryDate.getTime() - today.getTime()
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+        return diffDays
+    }
+
+    const daysLeft = getDaysUntilExpiry()
+    const isExpiringSoon = daysLeft <= 7
+
     return (
-        <TouchableOpacity
-            style={styles.container}
-            activeOpacity={0.7}
-            onPress={onPress}
-        >
-            {/* Expiry Badge */}
-            <View style={styles.expiryBadge}>
-                <Ionicons name="time-outline" size={10} color={dimeTheme.colors.textSecondary} />
-                <Text color={dimeTheme.colors.textSecondary} fontSize={10} marginLeft={2}>
-                    Expires: {expiry}
-                </Text>
-            </View>
-
-            <XStack alignItems="center" flex={1} gap="$3" marginTop="$2">
-                {/* Logo */}
-                <View style={styles.logoContainer}>
-                    {!showPlaceholder ? (
-                        <Image
-                            source={{ uri: logoUrl }}
-                            style={styles.logo}
-                            onError={() => setImageError(true)}
-                        />
-                    ) : (
-                        <View style={[styles.logoPlaceholder, { backgroundColor: symbolColor + '25' }]}>
-                            <Text color={symbolColor} fontSize={18} fontWeight="bold">
-                                {symbol.charAt(0)}
-                            </Text>
-                        </View>
-                    )}
-                </View>
-
-                {/* Symbol + Type */}
-                <YStack flex={1}>
-                    <XStack alignItems="center" gap="$2">
-                        <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={15}>
-                            {symbol}
-                        </Text>
-                        <View style={[styles.typeBadge, { backgroundColor: typeColor + '20' }]}>
-                            <Text color={typeColor} fontSize={11} fontWeight="bold">
-                                {type}
-                            </Text>
-                        </View>
-                    </XStack>
-                    <Text color={dimeTheme.colors.textSecondary} fontSize={12}>
-                        Strike: ${strike.toFixed(2)}
-                    </Text>
-                    <Text color={dimeTheme.colors.textTertiary} fontSize={11}>
-                        {contracts} contract{contracts > 1 ? 's' : ''} = {contracts * 100} shares
-                    </Text>
-                </YStack>
-
-                {/* Right: Value + P&L */}
-                <YStack alignItems="flex-end">
-                    <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={15}>
-                        {formatUSD(totalValue)}
-                    </Text>
-                    <XStack alignItems="center" gap="$1" marginTop="$1">
+        <TouchableOpacity activeOpacity={0.8} onPress={onPress}>
+            <LinearGradient
+                colors={gradientColors}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.container}
+            >
+                {/* Top: Type Badge + Expiry */}
+                <XStack justifyContent="space-between" alignItems="center" marginBottom="$3">
+                    {/* Option Type Badge */}
+                    <View style={[styles.typeBadge, { backgroundColor: typeColor }]}>
                         <Ionicons
-                            name={isProfit ? "trending-up" : "trending-down"}
+                            name={isCall ? "arrow-up" : "arrow-down"}
                             size={12}
-                            color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
+                            color="#fff"
+                        />
+                        <Text color="#fff" fontSize={12} fontWeight="bold" marginLeft={4}>
+                            {type.toUpperCase()}
+                        </Text>
+                    </View>
+
+                    {/* Expiry Badge */}
+                    <View style={[
+                        styles.expiryBadge,
+                        isExpiringSoon && styles.expiryBadgeUrgent
+                    ]}>
+                        <Ionicons
+                            name="time-outline"
+                            size={12}
+                            color={isExpiringSoon ? '#FF9800' : dimeTheme.colors.textSecondary}
                         />
                         <Text
-                            color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
-                            fontSize={14}
-                            fontWeight="bold"
+                            color={isExpiringSoon ? '#FF9800' : dimeTheme.colors.textSecondary}
+                            fontSize={11}
+                            fontWeight={isExpiringSoon ? "600" : "400"}
+                            marginLeft={4}
                         >
-                            {isProfit ? '+' : ''}{pnlPercent.toFixed(2)}%
+                            {daysLeft > 0 ? `${daysLeft}d left` : 'Expired'}
                         </Text>
-                    </XStack>
-                    <Text
-                        color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
-                        fontSize={11}
-                    >
-                        ({isProfit ? '+' : ''}{formatUSD(pnlAmount)})
-                    </Text>
-                </YStack>
-            </XStack>
+                    </View>
+                </XStack>
 
-            {/* Bottom Stats */}
-            <XStack marginTop="$3" paddingTop="$2" borderTopWidth={1} borderColor={dimeTheme.colors.border} justifyContent="space-between">
-                <YStack>
-                    <Text color={dimeTheme.colors.textTertiary} fontSize={10}>Premium Paid</Text>
-                    <Text color={dimeTheme.colors.textSecondary} fontSize={12}>${premium.toFixed(2)}</Text>
-                </YStack>
-                <YStack alignItems="center">
-                    <Text color={dimeTheme.colors.textTertiary} fontSize={10}>Current Price</Text>
-                    <Text color={dimeTheme.colors.textSecondary} fontSize={12}>${currentPrice.toFixed(2)}</Text>
-                </YStack>
-                <YStack alignItems="center">
-                    <Text color={dimeTheme.colors.textTertiary} fontSize={10}>Total Cost</Text>
-                    <Text color={dimeTheme.colors.textSecondary} fontSize={12}>{formatUSD(totalCost)}</Text>
-                </YStack>
-                <YStack alignItems="flex-end">
-                    <Text color={dimeTheme.colors.textTertiary} fontSize={10}>Delta</Text>
-                    <Text color={dimeTheme.colors.textSecondary} fontSize={12}>{delta.toFixed(2)}</Text>
-                </YStack>
-            </XStack>
+                {/* Main Row */}
+                <XStack alignItems="center" gap="$3">
+                    {/* Logo with Option Indicator */}
+                    <View style={styles.logoWrapper}>
+                        <View style={styles.logoContainer}>
+                            {!showPlaceholder ? (
+                                <Image
+                                    source={{ uri: logoUrl }}
+                                    style={styles.logo}
+                                    onError={() => setImageError(true)}
+                                />
+                            ) : (
+                                <View style={[styles.logoPlaceholder, { backgroundColor: symbolColor + '25' }]}>
+                                    <Text color={symbolColor} fontSize={18} fontWeight="bold">
+                                        {symbol.charAt(0)}
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                        {/* Option type indicator ring */}
+                        <View style={[styles.optionRing, { borderColor: typeColor }]} />
+                    </View>
+
+                    {/* Symbol + Strike Info */}
+                    <YStack flex={1}>
+                        <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={16}>
+                            {symbol}
+                        </Text>
+                        <XStack alignItems="center" gap="$2" marginTop="$1">
+                            <View style={styles.strikeBox}>
+                                <Text color={dimeTheme.colors.textSecondary} fontSize={11}>
+                                    Strike
+                                </Text>
+                                <Text color={dimeTheme.colors.textPrimary} fontWeight="600" fontSize={14}>
+                                    ${strike.toFixed(2)}
+                                </Text>
+                            </View>
+                            <View style={styles.contractsBox}>
+                                <Text color={dimeTheme.colors.textSecondary} fontSize={11}>
+                                    Contracts
+                                </Text>
+                                <Text color={dimeTheme.colors.textPrimary} fontWeight="600" fontSize={14}>
+                                    {contracts}
+                                </Text>
+                            </View>
+                        </XStack>
+                    </YStack>
+
+                    {/* Right: Value + P&L */}
+                    <YStack alignItems="flex-end">
+                        <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={17}>
+                            {formatUSD(totalValue)}
+                        </Text>
+                        <XStack
+                            alignItems="center"
+                            gap="$1"
+                            paddingVertical="$1"
+                            paddingHorizontal="$2"
+                            backgroundColor={isProfit ? 'rgba(0, 200, 83, 0.15)' : 'rgba(255, 82, 82, 0.15)'}
+                            borderRadius={6}
+                            marginTop="$1"
+                        >
+                            <Ionicons
+                                name={isProfit ? "caret-up" : "caret-down"}
+                                size={14}
+                                color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
+                            />
+                            <Text
+                                color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
+                                fontSize={13}
+                                fontWeight="bold"
+                            >
+                                {isProfit ? '+' : ''}{pnlPercent.toFixed(1)}%
+                            </Text>
+                        </XStack>
+                        <Text
+                            color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
+                            fontSize={11}
+                            marginTop="$1"
+                        >
+                            {isProfit ? '+' : ''}{formatUSD(pnlAmount)}
+                        </Text>
+                    </YStack>
+                </XStack>
+
+                {/* Bottom Stats - Greeks & Price */}
+                <View style={styles.statsContainer}>
+                    <View style={styles.statItem}>
+                        <Text color={dimeTheme.colors.textTertiary} fontSize={10}>PREMIUM</Text>
+                        <Text color={dimeTheme.colors.textPrimary} fontSize={13} fontWeight="600">
+                            ${premium.toFixed(2)}
+                        </Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                        <Text color={dimeTheme.colors.textTertiary} fontSize={10}>CURRENT</Text>
+                        <Text color={dimeTheme.colors.textPrimary} fontSize={13} fontWeight="600">
+                            ${currentPrice.toFixed(2)}
+                        </Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                        <Text color={dimeTheme.colors.textTertiary} fontSize={10}>DELTA</Text>
+                        <Text
+                            color={delta >= 0 ? dimeTheme.colors.profit : dimeTheme.colors.loss}
+                            fontSize={13}
+                            fontWeight="600"
+                        >
+                            {delta >= 0 ? '+' : ''}{delta.toFixed(2)}
+                        </Text>
+                    </View>
+                    <View style={styles.statDivider} />
+                    <View style={styles.statItem}>
+                        <Text color={dimeTheme.colors.textTertiary} fontSize={10}>IV</Text>
+                        <Text color={dimeTheme.colors.textSecondary} fontSize={13} fontWeight="600">
+                            {(iv * 100).toFixed(0)}%
+                        </Text>
+                    </View>
+                </View>
+            </LinearGradient>
         </TouchableOpacity>
     )
 }
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: dimeTheme.colors.surface,
-        padding: 16,
         marginHorizontal: 16,
-        marginBottom: 8,
-        borderRadius: 12,
+        marginBottom: 12,
+        borderRadius: 16,
+        padding: 16,
         borderWidth: 1,
-        borderColor: dimeTheme.colors.border,
+        borderColor: 'rgba(255, 255, 255, 0.08)',
+    },
+    typeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
     },
     expiryBadge: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: dimeTheme.colors.background,
-        paddingHorizontal: 8,
-        paddingVertical: 4,
-        borderRadius: 4,
-        alignSelf: 'flex-start',
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+    },
+    expiryBadgeUrgent: {
+        backgroundColor: 'rgba(255, 152, 0, 0.15)',
+    },
+    logoWrapper: {
+        position: 'relative',
     },
     logoContainer: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         overflow: 'hidden',
     },
     logo: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
     },
     logoPlaceholder: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
     },
-    typeBadge: {
-        paddingHorizontal: 8,
-        paddingVertical: 3,
-        borderRadius: 4,
+    optionRing: {
+        position: 'absolute',
+        top: -2,
+        left: -2,
+        right: -2,
+        bottom: -2,
+        borderRadius: 27,
+        borderWidth: 2,
+    },
+    strikeBox: {
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    contractsBox: {
+        backgroundColor: 'rgba(255, 255, 255, 0.05)',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 6,
+    },
+    statsContainer: {
+        flexDirection: 'row',
+        marginTop: 16,
+        paddingTop: 12,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(255, 255, 255, 0.08)',
+        justifyContent: 'space-between',
+    },
+    statItem: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    statDivider: {
+        width: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
     },
 })

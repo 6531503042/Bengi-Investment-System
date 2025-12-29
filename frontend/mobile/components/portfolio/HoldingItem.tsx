@@ -11,13 +11,13 @@ interface HoldingItemProps {
     quantity: number
     avgCost: number
     currentPrice: number
-    allocation: number // percentage of portfolio
+    allocation: number
     onPress?: () => void
 }
 
 // Generate consistent color from symbol
 const getSymbolColor = (symbol: string): string => {
-    const colors = ['#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#E91E63', '#00BCD4', '#FF5722', '#3F51B5']
+    const colors = ['#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#00BCD4', '#009688', '#4CAF50', '#FF9800', '#FF5722']
     let hash = 0
     for (let i = 0; i < symbol.length; i++) {
         hash = symbol.charCodeAt(i) + ((hash << 5) - hash)
@@ -44,13 +44,9 @@ export const HoldingItem: React.FC<HoldingItemProps> = ({
     const isProfit = pnlPercent >= 0
     const symbolColor = getSymbolColor(symbol)
 
-    const formatCurrency = (value: number) => {
-        if (value >= 1000000) {
-            return `$${(value / 1000000).toFixed(2)}M`
-        }
-        if (value >= 1000) {
-            return `$${(value / 1000).toFixed(2)}K`
-        }
+    const formatValue = (value: number) => {
+        if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`
+        if (value >= 1000) return `$${(value / 1000).toFixed(2)}K`
         return `$${value.toFixed(2)}`
     }
 
@@ -70,62 +66,69 @@ export const HoldingItem: React.FC<HoldingItemProps> = ({
             activeOpacity={0.7}
             onPress={onPress}
         >
-            {/* Left: Logo + Info */}
-            <XStack alignItems="center" flex={1} gap="$3">
-                {/* Logo */}
-                <View style={styles.logoContainer}>
-                    {!showPlaceholder ? (
-                        <Image
-                            source={{ uri: logoUrl }}
-                            style={styles.logo}
-                            onError={() => setImageError(true)}
-                        />
-                    ) : (
-                        <View style={[styles.logoPlaceholder, { backgroundColor: symbolColor + '25' }]}>
-                            <Text color={symbolColor} fontSize={18} fontWeight="bold">
-                                {symbol.charAt(0)}
-                            </Text>
-                        </View>
-                    )}
-                </View>
-
-                {/* Symbol + Name */}
-                <YStack flex={1}>
-                    <XStack alignItems="center" gap="$2">
-                        <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={15}>
-                            {symbol}
+            {/* Logo - Round with colored background */}
+            <View style={styles.logoWrapper}>
+                {!showPlaceholder ? (
+                    <Image
+                        source={{ uri: logoUrl }}
+                        style={styles.logo}
+                        onError={() => setImageError(true)}
+                    />
+                ) : (
+                    <View style={[styles.logoPlaceholder, { backgroundColor: symbolColor }]}>
+                        <Text color="#fff" fontSize={16} fontWeight="bold">
+                            {symbol.charAt(0)}
                         </Text>
-                        <View style={[styles.allocationBadge, { backgroundColor: symbolColor + '20' }]}>
-                            <Ionicons name="pie-chart" size={10} color={symbolColor} />
-                            <Text color={symbolColor} fontSize={10} fontWeight="600" marginLeft={2}>
-                                {allocation.toFixed(1)}%
-                            </Text>
-                        </View>
-                    </XStack>
-                    <Text color={dimeTheme.colors.textSecondary} fontSize={12} numberOfLines={1}>
-                        {name}
-                    </Text>
-                </YStack>
-            </XStack>
+                    </View>
+                )}
+            </View>
 
-            {/* Right: Value + P&L */}
-            <YStack alignItems="flex-end">
-                <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={15}>
-                    {formatCurrency(totalValue)}
+            {/* Symbol + Name + Allocation */}
+            <YStack flex={1} marginLeft={12}>
+                <XStack alignItems="center" gap={8}>
+                    <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={15}>
+                        {symbol}
+                    </Text>
+                    {/* Allocation Badge */}
+                    <View style={[styles.allocationBadge, { backgroundColor: symbolColor + '25' }]}>
+                        <Ionicons name="pie-chart" size={10} color={symbolColor} />
+                        <Text color={symbolColor} fontSize={10} fontWeight="600" marginLeft={3}>
+                            {allocation.toFixed(1)}%
+                        </Text>
+                    </View>
+                </XStack>
+                <Text
+                    color={dimeTheme.colors.textSecondary}
+                    fontSize={12}
+                    numberOfLines={1}
+                    marginTop={2}
+                >
+                    {name}
                 </Text>
-                <Text color={dimeTheme.colors.textTertiary} fontSize={11}>
+            </YStack>
+
+            {/* Value Column */}
+            <YStack alignItems="flex-end" minWidth={90}>
+                <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize={15}>
+                    {formatValue(totalValue)}
+                </Text>
+                <Text color={dimeTheme.colors.textTertiary} fontSize={11} marginTop={2}>
                     ≈ {formatUSD(totalValue)}
                 </Text>
-                <XStack alignItems="center" gap="$1" marginTop="$1">
+            </YStack>
+
+            {/* P&L Column */}
+            <YStack alignItems="flex-end" minWidth={80} marginLeft={8}>
+                <XStack alignItems="center" gap={3}>
                     <Ionicons
-                        name={isProfit ? "trending-up" : "trending-down"}
+                        name={isProfit ? "arrow-up" : "arrow-down"}
                         size={12}
                         color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
                     />
                     <Text
                         color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
-                        fontSize={13}
-                        fontWeight="600"
+                        fontSize={14}
+                        fontWeight="bold"
                     >
                         {isProfit ? '+' : ''}{pnlPercent.toFixed(2)}%
                     </Text>
@@ -133,6 +136,7 @@ export const HoldingItem: React.FC<HoldingItemProps> = ({
                 <Text
                     color={isProfit ? dimeTheme.colors.profit : dimeTheme.colors.loss}
                     fontSize={11}
+                    marginTop={2}
                 >
                     ({isProfit ? '+' : ''}{formatUSD(pnlAmount)})
                 </Text>
@@ -146,14 +150,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: dimeTheme.colors.surface,
-        padding: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
         marginHorizontal: 16,
         marginBottom: 8,
-        borderRadius: 12,
+        borderRadius: 14,
         borderWidth: 1,
         borderColor: dimeTheme.colors.border,
     },
-    logoContainer: {
+    logoWrapper: {
         width: 44,
         height: 44,
         borderRadius: 22,
@@ -163,6 +168,8 @@ const styles = StyleSheet.create({
         width: 44,
         height: 44,
         borderRadius: 22,
+        backgroundColor: '#fff',
+        resizeMode: 'contain',
     },
     logoPlaceholder: {
         width: 44,
@@ -175,7 +182,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         paddingHorizontal: 6,
-        paddingVertical: 2,
-        borderRadius: 4,
+        paddingVertical: 3,
+        borderRadius: 10,
     },
 })
