@@ -13,18 +13,18 @@ import { OptionItem } from '@/components/portfolio/OptionItem'
 
 // Mock data for when no real positions exist (demo mode)
 const MOCK_HOLDINGS = [
-    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com', quantity: 15, avgCost: 120.50, currentPrice: 134.82 },
-    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com', quantity: 8, avgCost: 245.00, currentPrice: 421.06 },
-    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com', quantity: 25, avgCost: 168.00, currentPrice: 254.49 },
-    { symbol: 'AMZN', name: 'Amazon.com', logoUrl: 'https://img.logo.dev/amazon.com', quantity: 12, avgCost: 142.50, currentPrice: 227.05 },
-    { symbol: 'PLTR', name: 'Palantir Technologies', logoUrl: 'https://img.logo.dev/palantir.com', quantity: 100, avgCost: 18.50, currentPrice: 75.14 },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 15, avgCost: 120.50, currentPrice: 134.82 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 8, avgCost: 245.00, currentPrice: 421.06 },
+    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 25, avgCost: 168.00, currentPrice: 254.49 },
+    { symbol: 'AMZN', name: 'Amazon.com', logoUrl: 'https://img.logo.dev/amazon.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 12, avgCost: 142.50, currentPrice: 227.05 },
+    { symbol: 'PLTR', name: 'Palantir Technologies', logoUrl: 'https://img.logo.dev/palantir.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 100, avgCost: 18.50, currentPrice: 75.14 },
 ]
 
 // Mock options (options not in backend yet)
 const MOCK_OPTIONS = [
-    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com', type: 'Call' as const, strike: 450.00, expiry: '2025-02-21', contracts: 2, premium: 12.50, currentPrice: 28.75, delta: 0.45, theta: -0.15, iv: 0.52 },
-    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com', type: 'Call' as const, strike: 150.00, expiry: '2025-03-14', contracts: 3, premium: 8.20, currentPrice: 12.35, delta: 0.38, theta: -0.08, iv: 0.48 },
-    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com', type: 'Put' as const, strike: 240.00, expiry: '2025-01-15', contracts: 5, premium: 3.50, currentPrice: 2.15, delta: -0.32, theta: -0.22, iv: 0.35 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', type: 'Call' as const, strike: 450.00, expiry: '2025-02-21', contracts: 2, premium: 12.50, currentPrice: 28.75, delta: 0.45, theta: -0.15, iv: 0.52 },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', type: 'Call' as const, strike: 150.00, expiry: '2025-03-14', contracts: 3, premium: 8.20, currentPrice: 12.35, delta: 0.38, theta: -0.08, iv: 0.48 },
+    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', type: 'Put' as const, strike: 240.00, expiry: '2025-01-15', contracts: 5, premium: 3.50, currentPrice: 2.15, delta: -0.32, theta: -0.22, iv: 0.35 },
 ]
 
 // Portfolio tabs
