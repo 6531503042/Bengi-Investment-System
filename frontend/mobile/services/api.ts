@@ -114,21 +114,60 @@ export const instrumentService = {
     },
 }
 
-// Portfolio API
+// Portfolio API - Types from backend
+interface PositionResponse {
+    id: string
+    portfolioId: string
+    instrumentId: string
+    symbol: string
+    quantity: number
+    avgCost: number
+    totalCost: number
+    currentPrice?: number
+    marketValue?: number
+    unrealizedPnL?: number
+    unrealizedPnLPct?: number
+}
+
+interface PortfolioSummaryResponse {
+    portfolio: Portfolio
+    positions: PositionResponse[]
+    totalValue: number
+    totalCost: number
+    totalPnL: number
+    totalPnLPct: number
+}
+
 export const portfolioService = {
-    getAll: async () => {
-        const { data } = await api.get<{ portfolios: Portfolio[] }>('/portfolios')
-        return data.portfolios
+    getAll: async (): Promise<Portfolio[]> => {
+        try {
+            const { data: response } = await api.get<ApiResponse<{ portfolios: Portfolio[] }>>('/portfolios')
+            return response?.data?.portfolios ?? []
+        } catch (error) {
+            console.error('Failed to get portfolios:', error)
+            return []
+        }
     },
 
-    getById: async (id: string) => {
-        const { data } = await api.get<Portfolio>(`/portfolios/${id}`)
-        return data
+    getById: async (id: string): Promise<Portfolio> => {
+        const { data: response } = await api.get<ApiResponse<Portfolio>>(`/portfolios/${id}`)
+        return response.data
     },
 
-    getSummary: async (id: string) => {
-        const { data } = await api.get(`/portfolios/${id}/summary`)
-        return data
+    getSummary: async (id: string): Promise<PortfolioSummaryResponse> => {
+        const { data: response } = await api.get<ApiResponse<PortfolioSummaryResponse>>(`/portfolios/${id}/summary`)
+        return response.data
+    },
+
+    getPositions: async (id: string): Promise<PositionResponse[]> => {
+        const { data: response } = await api.get<ApiResponse<{ positions: PositionResponse[] }>>(`/portfolios/${id}/positions`)
+        return response.data.positions ?? []
+    },
+
+    // Create default portfolio if user doesn't have one
+    create: async (accountId: string, name: string = 'My Portfolio'): Promise<Portfolio> => {
+        const { data: response } = await api.post<ApiResponse<Portfolio>>('/portfolios', { accountId, name })
+        return response.data
     },
 }
 

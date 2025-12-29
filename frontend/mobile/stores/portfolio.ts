@@ -1,73 +1,165 @@
 import { create } from 'zustand'
-import type { Portfolio, Account, PortfolioState } from '@/types/portfolio'
-import { portfolioService, accountService } from '@/services/api'
+import { portfolioService, instrumentService } from '@/services/api'
+import type { Portfolio } from '@/types/portfolio'
 
-interface PortfolioActions {
-    fetchPortfolios: () => Promise<void>
-    fetchAccounts: () => Promise<void>
-    selectPortfolio: (id: string) => void
-    getSelectedPortfolio: () => Portfolio | null
-    deposit: (accountId: string, amount: number) => Promise<boolean>
-    withdraw: (accountId: string, amount: number) => Promise<boolean>
+// Position with instrument info for display
+export interface PortfolioPosition {
+    id: string
+    portfolioId: string
+    instrumentId: string
+    symbol: string
+    name: string
+    logoUrl?: string
+    quantity: number
+    avgCost: number
+    totalCost: number
+    currentPrice: number
+    marketValue: number
+    unrealizedPnL: number
+    unrealizedPnLPct: number
 }
 
-export const usePortfolioStore = create<PortfolioState & PortfolioActions>((set, get) => ({
+interface PortfolioSummary {
+    totalValue: number
+    totalCost: number
+    totalPnL: number
+    totalPnLPct: number
+    cashBalance: number
+    investedValue: number
+    dailyChange: number
+    dailyChangePercent: number
+}
+
+interface PortfolioState {
+    portfolios: Portfolio[]
+    activePortfolio: Portfolio | null
+    positions: PortfolioPosition[]
+    summary: PortfolioSummary
+    isLoading: boolean
+    error: string | null
+
+    // Actions
+    fetchPortfolios: () => Promise<void>
+    fetchPortfolioSummary: (id: string) => Promise<void>
+    setActivePortfolio: (portfolio: Portfolio) => void
+    refreshPositions: () => Promise<void>
+}
+
+// Initial empty summary
+const emptySummary: PortfolioSummary = {
+    totalValue: 0,
+    totalCost: 0,
+    totalPnL: 0,
+    totalPnLPct: 0,
+    cashBalance: 0,
+    investedValue: 0,
+    dailyChange: 0,
+    dailyChangePercent: 0,
+}
+
+export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     portfolios: [],
-    accounts: [],
-    selectedPortfolioId: null,
+    activePortfolio: null,
+    positions: [],
+    summary: emptySummary,
     isLoading: false,
+    error: null,
 
     fetchPortfolios: async () => {
-        set({ isLoading: true })
+        set({ isLoading: true, error: null })
         try {
-            const portfolios = await portfolioService.getAll()
-            set({
-                portfolios: portfolios ?? [],
-                isLoading: false,
-                selectedPortfolioId: portfolios?.[0]?.id ?? null,
-            })
-        } catch (error) {
+            const portfolios = await portfolioService.getAll() ?? []
+            set({ portfolios, isLoading: false })
+
+            // Auto-select first portfolio if none active
+            if (portfolios.length > 0 && !get().activePortfolio) {
+                const defaultPortfolio = portfolios.find(p => p.isDefault) || portfolios[0]
+                set({ activePortfolio: defaultPortfolio })
+                // Fetch summary for the active portfolio
+                await get().fetchPortfolioSummary(defaultPortfolio.id)
+            }
+        } catch (error: any) {
             console.error('Failed to fetch portfolios:', error)
-            set({ portfolios: [], isLoading: false })
+            // Don't show error for empty portfolio (demo mode)
+            set({
+                portfolios: [],
+                isLoading: false,
+                error: null // Suppress error for demo mode
+            })
         }
     },
 
-    fetchAccounts: async () => {
+    fetchPortfolioSummary: async (id: string) => {
+        set({ isLoading: true, error: null })
         try {
-            const accounts = await accountService.getAll()
-            set({ accounts: accounts ?? [] })
-        } catch (error) {
-            console.error('Failed to fetch accounts:', error)
-            set({ accounts: [] })
+            const summaryData = await portfolioService.getSummary(id)
+
+            // Enrich positions with instrument data
+            const enrichedPositions: PortfolioPosition[] = await Promise.all(
+                (summaryData.positions || []).map(async (pos) => {
+                    let instrumentData = { name: pos.symbol, logoUrl: undefined }
+                    try {
+                        const instrument = await instrumentService.getBySymbol(pos.symbol)
+                        instrumentData = { name: instrument.name, logoUrl: instrument.logoUrl }
+                    } catch {
+                        // Use symbol as name if instrument not found
+                    }
+
+                    return {
+                        id: pos.id,
+                        portfolioId: pos.portfolioId,
+                        instrumentId: pos.instrumentId,
+                        symbol: pos.symbol,
+                        name: instrumentData.name,
+                        logoUrl: instrumentData.logoUrl,
+                        quantity: pos.quantity,
+                        avgCost: pos.avgCost,
+                        totalCost: pos.totalCost,
+                        currentPrice: pos.currentPrice || 0,
+                        marketValue: pos.marketValue || pos.quantity * (pos.currentPrice || pos.avgCost),
+                        unrealizedPnL: pos.unrealizedPnL || 0,
+                        unrealizedPnLPct: pos.unrealizedPnLPct || 0,
+                    }
+                })
+            )
+
+            // Calculate summary
+            const investedValue = enrichedPositions.reduce((sum, p) => sum + p.marketValue, 0)
+
+            const summary: PortfolioSummary = {
+                totalValue: summaryData.totalValue || investedValue,
+                totalCost: summaryData.totalCost || enrichedPositions.reduce((sum, p) => sum + p.totalCost, 0),
+                totalPnL: summaryData.totalPnL || 0,
+                totalPnLPct: summaryData.totalPnLPct || 0,
+                cashBalance: (summaryData.totalValue || 0) - investedValue,
+                investedValue,
+                dailyChange: summaryData.totalPnL * 0.1, // Mock daily (10% of total P&L)
+                dailyChangePercent: summaryData.totalPnLPct * 0.1,
+            }
+
+            set({
+                positions: enrichedPositions,
+                summary,
+                isLoading: false
+            })
+        } catch (error: any) {
+            console.error('Failed to fetch portfolio summary:', error)
+            set({
+                isLoading: false,
+                error: error.response?.data?.message || 'Failed to fetch portfolio summary'
+            })
         }
     },
 
-    selectPortfolio: (id) => set({ selectedPortfolioId: id }),
-
-    getSelectedPortfolio: () => {
-        const { portfolios, selectedPortfolioId } = get()
-        return portfolios.find((p) => p.id === selectedPortfolioId) ?? null
+    setActivePortfolio: (portfolio: Portfolio) => {
+        set({ activePortfolio: portfolio })
+        get().fetchPortfolioSummary(portfolio.id)
     },
 
-    deposit: async (accountId, amount) => {
-        try {
-            await accountService.deposit(accountId, amount)
-            await get().fetchAccounts()
-            return true
-        } catch (error) {
-            console.error('Deposit failed:', error)
-            return false
-        }
-    },
-
-    withdraw: async (accountId, amount) => {
-        try {
-            await accountService.withdraw(accountId, amount)
-            await get().fetchAccounts()
-            return true
-        } catch (error) {
-            console.error('Withdraw failed:', error)
-            return false
+    refreshPositions: async () => {
+        const { activePortfolio } = get()
+        if (activePortfolio) {
+            await get().fetchPortfolioSummary(activePortfolio.id)
         }
     },
 }))
