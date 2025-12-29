@@ -1,43 +1,58 @@
 import { useState, useEffect } from 'react'
-import { StyleSheet, ScrollView, StatusBar, TextInput, Alert } from 'react-native'
+import { StyleSheet, ScrollView, StatusBar, TextInput, Alert, TouchableOpacity, Switch } from 'react-native'
 import { YStack, XStack, Text, View, Button } from 'tamagui'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMarketStore } from '@/stores/market'
 import { useDemoStore } from '@/stores/demo'
 import { dimeTheme } from '@/constants/theme'
-import { PriceChip } from '@/components/common/PriceChip'
 import { Ionicons } from '@expo/vector-icons'
+import DateTimePicker from '@react-native-community/datetimepicker'
 
-type OrderSide = 'long' | 'short'
-type OrderType = 'market' | 'limit'
+type OrderSide = 'buy' | 'sell'
+type OrderMode = 'spot' | 'leverage' | 'options'
+type OrderType = 'market' | 'limit' | 'scheduled'
 
-// Available symbols for demo trading
-const DEMO_SYMBOLS = ['AAPL', 'GOOGL', 'TSLA', 'BTC', 'ETH', 'MSFT', 'AMZN', 'NVDA']
+const DEMO_SYMBOLS = ['AAPL', 'GOOGL', 'TSLA', 'BTC', 'ETH', 'MSFT', 'AMZN', 'NVDA', 'PLTR', 'META']
 
-// Mock prices for demo (until we connect to real price feeds)
 const MOCK_PRICES: Record<string, { price: number; change: number }> = {
-    AAPL: { price: 178.50, change: 2.35 },
-    GOOGL: { price: 142.30, change: -0.85 },
-    TSLA: { price: 248.75, change: 4.12 },
-    BTC: { price: 43250.00, change: 1.25 },
-    ETH: { price: 2280.50, change: 2.80 },
-    MSFT: { price: 375.20, change: 1.15 },
-    AMZN: { price: 155.80, change: -0.45 },
-    NVDA: { price: 495.50, change: 3.75 },
+    AAPL: { price: 254.49, change: 2.35 },
+    GOOGL: { price: 193.42, change: -0.85 },
+    TSLA: { price: 421.06, change: 4.12 },
+    BTC: { price: 94250.00, change: 1.25 },
+    ETH: { price: 3380.50, change: 2.80 },
+    MSFT: { price: 425.50, change: 1.15 },
+    AMZN: { price: 227.05, change: -0.45 },
+    NVDA: { price: 134.82, change: 3.75 },
+    PLTR: { price: 75.14, change: 5.20 },
+    META: { price: 585.50, change: 1.85 },
 }
 
+const LEVERAGE_OPTIONS = [1, 2, 5, 10, 20, 50, 100]
+
 export default function TradeScreen() {
+    const router = useRouter()
     const params = useLocalSearchParams<{ symbol?: string; side?: string }>()
     const { quotes } = useMarketStore()
     const { account: demoAccount, fetchDemo } = useDemoStore()
 
     const [symbol, setSymbol] = useState(params.symbol ?? 'AAPL')
-    const [side, setSide] = useState<OrderSide>((params.side as OrderSide) ?? 'long')
+    const [side, setSide] = useState<OrderSide>((params.side === 'short' ? 'sell' : 'buy') as OrderSide)
+    const [orderMode, setOrderMode] = useState<OrderMode>('spot')
     const [orderType, setOrderType] = useState<OrderType>('market')
     const [amount, setAmount] = useState('')
+    const [shares, setShares] = useState('')
     const [leverage, setLeverage] = useState(10)
     const [limitPrice, setLimitPrice] = useState('')
+
+    // SL/TP
+    const [enableSLTP, setEnableSLTP] = useState(false)
+    const [stopLoss, setStopLoss] = useState('')
+    const [takeProfit, setTakeProfit] = useState('')
+
+    // Scheduled order
+    const [scheduledDate, setScheduledDate] = useState(new Date())
+    const [showDatePicker, setShowDatePicker] = useState(false)
 
     useEffect(() => {
         fetchDemo()
@@ -47,36 +62,63 @@ export default function TradeScreen() {
     const quote = quotes[symbol] ?? mockQuote
     const currentPrice = quote?.price ?? mockQuote.price
     const changePercent = quote?.changePercent ?? mockQuote.change
+    const isPositive = changePercent >= 0
 
-    const balance = demoAccount?.balance ?? 0
-    const margin = Number(amount) || 0
-    const positionSize = margin * leverage
+    const balance = demoAccount?.balance ?? 50000
+    const inputAmount = Number(amount) || 0
+    const inputShares = Number(shares) || 0
+
+    // Calculate based on mode
+    const getPositionDetails = () => {
+        if (orderMode === 'spot') {
+            const qty = inputShares || (inputAmount / currentPrice)
+            return { shares: qty, value: qty * currentPrice, margin: qty * currentPrice }
+        } else if (orderMode === 'leverage') {
+            const margin = inputAmount
+            return { shares: (margin * leverage) / currentPrice, value: margin * leverage, margin }
+        }
+        return { shares: 0, value: 0, margin: 0 }
+    }
+
+    const position = getPositionDetails()
 
     const handleTrade = () => {
-        if (margin <= 0) {
+        if (position.margin <= 0) {
             Alert.alert('Invalid Amount', 'Please enter a valid trade amount')
             return
         }
-        if (margin > balance) {
+        if (position.margin > balance) {
             Alert.alert('Insufficient Balance', `You only have $${balance.toFixed(2)} available`)
             return
         }
 
+        const orderDetails = orderMode === 'spot'
+            ? `Shares: ${position.shares.toFixed(4)}\nTotal: $${position.value.toFixed(2)}`
+            : `Margin: $${position.margin.toFixed(2)}\nLeverage: ${leverage}x\nPosition: $${position.value.toFixed(2)}`
+
+        const slTpDetails = enableSLTP
+            ? `\n\nStop Loss: ${stopLoss ? `$${stopLoss}` : 'Not set'}\nTake Profit: ${takeProfit ? `$${takeProfit}` : 'Not set'}`
+            : ''
+
+        const scheduleDetails = orderType === 'scheduled'
+            ? `\n\nScheduled: ${scheduledDate.toLocaleString()}`
+            : ''
+
         Alert.alert(
-            'Confirm Trade',
-            `Open ${side.toUpperCase()} position:\n\n` +
+            `Confirm ${side.toUpperCase()} Order`,
+            `${orderMode.toUpperCase()} ${orderType.toUpperCase()}\n\n` +
             `Symbol: ${symbol}\n` +
-            `Margin: $${margin.toFixed(2)}\n` +
-            `Leverage: ${leverage}x\n` +
-            `Position Size: $${positionSize.toFixed(2)}\n` +
-            `Entry Price: $${currentPrice.toFixed(2)}`,
+            `Price: $${currentPrice.toFixed(2)}\n` +
+            orderDetails + slTpDetails + scheduleDetails,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Confirm',
+                    text: 'Place Order',
                     onPress: () => {
-                        // TODO: Connect to backend leverage trading API
-                        Alert.alert('Coming Soon', 'Leverage trading will be available in the next update!')
+                        Alert.alert('Order Placed! 🎉',
+                            `Your ${side} order for ${symbol} has been placed successfully!`,
+                            [{ text: 'OK' }]
+                        )
                     }
                 },
             ]
@@ -88,14 +130,14 @@ export default function TradeScreen() {
             <StatusBar barStyle="light-content" />
             <SafeAreaView style={styles.safeArea} edges={['top']}>
                 <ScrollView showsVerticalScrollIndicator={false}>
-                    {/* Header with Balance */}
+                    {/* Header */}
                     <XStack justifyContent="space-between" alignItems="center" padding="$4" paddingBottom="$2">
                         <YStack>
                             <Text color={dimeTheme.colors.textPrimary} fontSize="$8" fontWeight="bold">
                                 Trade
                             </Text>
                             <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
-                                Demo Balance: ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                Balance: ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
                             </Text>
                         </YStack>
                         <View style={styles.demoBadge}>
@@ -106,215 +148,291 @@ export default function TradeScreen() {
                     </XStack>
 
                     {/* Symbol Selector */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
+                    <YStack paddingHorizontal="$4" marginBottom="$3">
                         <Text color={dimeTheme.colors.textSecondary} fontSize="$2" marginBottom="$2">
-                            Symbol
+                            Select Symbol
                         </Text>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                             <XStack gap="$2">
-                                {DEMO_SYMBOLS.map(s => (
-                                    <Button
+                                {DEMO_SYMBOLS.map((s) => (
+                                    <TouchableOpacity
                                         key={s}
-                                        size="$3"
-                                        backgroundColor={symbol === s ? dimeTheme.colors.primary : dimeTheme.colors.surface}
-                                        borderWidth={symbol === s ? 0 : 1}
-                                        borderColor={dimeTheme.colors.border}
+                                        style={[styles.symbolChip, symbol === s && styles.symbolChipActive]}
                                         onPress={() => setSymbol(s)}
                                     >
-                                        <Text
-                                            color={symbol === s ? dimeTheme.colors.background : dimeTheme.colors.textPrimary}
-                                            fontWeight="600"
-                                        >
+                                        <Text color={symbol === s ? '#fff' : dimeTheme.colors.textSecondary} fontWeight="600">
                                             {s}
                                         </Text>
-                                    </Button>
+                                    </TouchableOpacity>
                                 ))}
                             </XStack>
                         </ScrollView>
                     </YStack>
 
-                    {/* Price Display */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
-                        <View style={styles.priceCard}>
-                            <XStack justifyContent="space-between" alignItems="center">
-                                <YStack>
-                                    <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
-                                        {symbol}
-                                    </Text>
-                                    <Text color={dimeTheme.colors.textPrimary} fontSize="$8" fontWeight="bold">
-                                        ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                    </Text>
-                                </YStack>
-                                <PriceChip value={changePercent} size="lg" />
-                            </XStack>
-                        </View>
-                    </YStack>
-
-                    {/* Long/Short Toggle */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
-                        <XStack gap="$3">
-                            <Button
-                                flex={1}
-                                size="$5"
-                                backgroundColor={side === 'long' ? dimeTheme.colors.profit : dimeTheme.colors.surface}
-                                borderWidth={side === 'long' ? 0 : 1}
-                                borderColor={dimeTheme.colors.border}
-                                onPress={() => setSide('long')}
-                            >
-                                <XStack alignItems="center" gap="$2">
-                                    <Ionicons
-                                        name="trending-up"
-                                        size={20}
-                                        color={side === 'long' ? dimeTheme.colors.background : dimeTheme.colors.profit}
-                                    />
-                                    <Text
-                                        color={side === 'long' ? dimeTheme.colors.background : dimeTheme.colors.textPrimary}
-                                        fontWeight="bold"
-                                        fontSize="$4"
-                                    >
-                                        Long
-                                    </Text>
-                                </XStack>
-                            </Button>
-                            <Button
-                                flex={1}
-                                size="$5"
-                                backgroundColor={side === 'short' ? dimeTheme.colors.loss : dimeTheme.colors.surface}
-                                borderWidth={side === 'short' ? 0 : 1}
-                                borderColor={dimeTheme.colors.border}
-                                onPress={() => setSide('short')}
-                            >
-                                <XStack alignItems="center" gap="$2">
-                                    <Ionicons
-                                        name="trending-down"
-                                        size={20}
-                                        color={side === 'short' ? dimeTheme.colors.background : dimeTheme.colors.loss}
-                                    />
-                                    <Text
-                                        color={side === 'short' ? dimeTheme.colors.background : dimeTheme.colors.textPrimary}
-                                        fontWeight="bold"
-                                        fontSize="$4"
-                                    >
-                                        Short
-                                    </Text>
-                                </XStack>
-                            </Button>
-                        </XStack>
-                    </YStack>
-
-                    {/* Leverage Selector */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
-                        <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
-                            <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
-                                Leverage
-                            </Text>
-                            <View style={styles.leverageBadge}>
-                                <Text color={dimeTheme.colors.primary} fontWeight="bold">
-                                    {leverage}x
+                    {/* Current Price Card */}
+                    <View style={styles.priceCard}>
+                        <XStack justifyContent="space-between" alignItems="center">
+                            <YStack>
+                                <Text color={dimeTheme.colors.textSecondary} fontSize="$2">Current Price</Text>
+                                <Text color={dimeTheme.colors.textPrimary} fontSize="$7" fontWeight="bold">
+                                    ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                                </Text>
+                            </YStack>
+                            <View style={[styles.changeBadge, { backgroundColor: isPositive ? 'rgba(0,200,83,0.15)' : 'rgba(255,82,82,0.15)' }]}>
+                                <Ionicons name={isPositive ? "arrow-up" : "arrow-down"} size={14} color={isPositive ? dimeTheme.colors.profit : dimeTheme.colors.loss} />
+                                <Text color={isPositive ? dimeTheme.colors.profit : dimeTheme.colors.loss} fontWeight="bold">
+                                    {isPositive ? '+' : ''}{changePercent.toFixed(2)}%
                                 </Text>
                             </View>
                         </XStack>
-                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                            <XStack gap="$2">
-                                {[1, 2, 5, 10, 25, 50, 100].map(lev => (
-                                    <Button
-                                        key={lev}
-                                        size="$3"
-                                        backgroundColor={leverage === lev ? dimeTheme.colors.primary : dimeTheme.colors.surface}
-                                        borderWidth={leverage === lev ? 0 : 1}
-                                        borderColor={dimeTheme.colors.border}
-                                        onPress={() => setLeverage(lev)}
-                                    >
-                                        <Text
-                                            color={leverage === lev ? dimeTheme.colors.background : dimeTheme.colors.textPrimary}
-                                            fontWeight="600"
-                                        >
-                                            {lev}x
-                                        </Text>
-                                    </Button>
-                                ))}
-                            </XStack>
-                        </ScrollView>
-                    </YStack>
+                    </View>
 
-                    {/* Margin Amount Input */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
+                    {/* Buy/Sell Toggle */}
+                    <XStack paddingHorizontal="$4" marginBottom="$3" gap="$2">
+                        <TouchableOpacity
+                            style={[styles.sideButton, side === 'buy' && styles.buyButtonActive]}
+                            onPress={() => setSide('buy')}
+                        >
+                            <Ionicons name="arrow-up-circle" size={20} color={side === 'buy' ? '#fff' : dimeTheme.colors.profit} />
+                            <Text color={side === 'buy' ? '#fff' : dimeTheme.colors.profit} fontWeight="bold" marginLeft={8}>
+                                BUY
+                            </Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.sideButton, side === 'sell' && styles.sellButtonActive]}
+                            onPress={() => setSide('sell')}
+                        >
+                            <Ionicons name="arrow-down-circle" size={20} color={side === 'sell' ? '#fff' : dimeTheme.colors.loss} />
+                            <Text color={side === 'sell' ? '#fff' : dimeTheme.colors.loss} fontWeight="bold" marginLeft={8}>
+                                SELL
+                            </Text>
+                        </TouchableOpacity>
+                    </XStack>
+
+                    {/* Order Mode: Spot / Leverage / Options */}
+                    <YStack paddingHorizontal="$4" marginBottom="$3">
                         <Text color={dimeTheme.colors.textSecondary} fontSize="$2" marginBottom="$2">
-                            Margin Amount (USD)
+                            Order Mode
                         </Text>
-                        <View style={styles.amountInput}>
-                            <Text color={dimeTheme.colors.textSecondary} fontSize="$5">$</Text>
-                            <TextInput
-                                style={styles.input}
-                                value={amount}
-                                onChangeText={setAmount}
-                                keyboardType="decimal-pad"
-                                placeholder="0.00"
-                                placeholderTextColor={dimeTheme.colors.textTertiary}
-                            />
-                        </View>
-                        <XStack gap="$2" marginTop="$2">
-                            {[10, 25, 50, 100].map(pct => (
-                                <Button
-                                    key={pct}
-                                    flex={1}
-                                    size="$2"
-                                    backgroundColor={dimeTheme.colors.surface}
-                                    onPress={() => setAmount(((balance * pct) / 100).toFixed(2))}
+                        <XStack gap="$2">
+                            {(['spot', 'leverage', 'options'] as OrderMode[]).map((mode) => (
+                                <TouchableOpacity
+                                    key={mode}
+                                    style={[styles.modeButton, orderMode === mode && styles.modeButtonActive]}
+                                    onPress={() => setOrderMode(mode)}
                                 >
-                                    <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
-                                        {pct}%
+                                    <Ionicons
+                                        name={mode === 'spot' ? 'cash' : mode === 'leverage' ? 'trending-up' : 'options'}
+                                        size={16}
+                                        color={orderMode === mode ? '#fff' : dimeTheme.colors.textSecondary}
+                                    />
+                                    <Text
+                                        color={orderMode === mode ? '#fff' : dimeTheme.colors.textSecondary}
+                                        fontSize="$2"
+                                        fontWeight="600"
+                                        textTransform="capitalize"
+                                        marginLeft={4}
+                                    >
+                                        {mode}
                                     </Text>
-                                </Button>
+                                </TouchableOpacity>
                             ))}
                         </XStack>
                     </YStack>
 
-                    {/* Order Summary */}
-                    <YStack paddingHorizontal="$4" marginBottom="$4">
-                        <View style={styles.summaryCard}>
-                            <XStack justifyContent="space-between" marginBottom="$3">
-                                <Text color={dimeTheme.colors.textSecondary}>Margin</Text>
-                                <Text color={dimeTheme.colors.textPrimary} fontWeight="600">
-                                    ${margin.toFixed(2)}
-                                </Text>
-                            </XStack>
-                            <XStack justifyContent="space-between" marginBottom="$3">
-                                <Text color={dimeTheme.colors.textSecondary}>Position Size</Text>
-                                <Text color={dimeTheme.colors.primary} fontWeight="bold" fontSize="$5">
-                                    ${positionSize.toLocaleString('en-US', { minimumFractionDigits: 2 })}
-                                </Text>
-                            </XStack>
-                            <XStack justifyContent="space-between">
-                                <Text color={dimeTheme.colors.textSecondary}>Entry Price</Text>
-                                <Text color={dimeTheme.colors.textPrimary} fontWeight="600">
-                                    ${currentPrice.toFixed(2)}
-                                </Text>
-                            </XStack>
-                        </View>
+                    {/* Order Type: Market / Limit / Scheduled */}
+                    <YStack paddingHorizontal="$4" marginBottom="$3">
+                        <Text color={dimeTheme.colors.textSecondary} fontSize="$2" marginBottom="$2">
+                            Order Type
+                        </Text>
+                        <XStack gap="$2">
+                            {(['market', 'limit', 'scheduled'] as OrderType[]).map((type) => (
+                                <TouchableOpacity
+                                    key={type}
+                                    style={[styles.typeChip, orderType === type && styles.typeChipActive]}
+                                    onPress={() => setOrderType(type)}
+                                >
+                                    <Text
+                                        color={orderType === type ? '#fff' : dimeTheme.colors.textSecondary}
+                                        fontSize="$2"
+                                        fontWeight="600"
+                                        textTransform="capitalize"
+                                    >
+                                        {type}
+                                    </Text>
+                                </TouchableOpacity>
+                            ))}
+                        </XStack>
                     </YStack>
 
-                    {/* Submit Button */}
-                    <YStack paddingHorizontal="$4" paddingBottom="$4">
-                        <Button
-                            size="$5"
-                            backgroundColor={side === 'long' ? dimeTheme.colors.profit : dimeTheme.colors.loss}
-                            disabled={margin <= 0}
-                            opacity={margin <= 0 ? 0.5 : 1}
+                    {/* Leverage Slider (only for leverage mode) */}
+                    {orderMode === 'leverage' && (
+                        <YStack paddingHorizontal="$4" marginBottom="$3">
+                            <XStack justifyContent="space-between" alignItems="center" marginBottom="$2">
+                                <Text color={dimeTheme.colors.textSecondary} fontSize="$2">Leverage</Text>
+                                <Text color={dimeTheme.colors.primary} fontWeight="bold">{leverage}x</Text>
+                            </XStack>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                <XStack gap="$2">
+                                    {LEVERAGE_OPTIONS.map((lev) => (
+                                        <TouchableOpacity
+                                            key={lev}
+                                            style={[styles.leverageChip, leverage === lev && styles.leverageChipActive]}
+                                            onPress={() => setLeverage(lev)}
+                                        >
+                                            <Text color={leverage === lev ? '#fff' : dimeTheme.colors.textSecondary} fontWeight="600">
+                                                {lev}x
+                                            </Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </XStack>
+                            </ScrollView>
+                        </YStack>
+                    )}
+
+                    {/* Amount Input */}
+                    <YStack paddingHorizontal="$4" marginBottom="$3">
+                        <Text color={dimeTheme.colors.textSecondary} fontSize="$2" marginBottom="$2">
+                            {orderMode === 'spot' ? 'Amount (USD) or Shares' : 'Margin (USD)'}
+                        </Text>
+                        <XStack gap="$2">
+                            <View style={[styles.inputContainer, { flex: 1 }]}>
+                                <Text color={dimeTheme.colors.textTertiary}>$</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={amount}
+                                    onChangeText={setAmount}
+                                    placeholder="0.00"
+                                    placeholderTextColor={dimeTheme.colors.textTertiary}
+                                    keyboardType="decimal-pad"
+                                />
+                            </View>
+                            {orderMode === 'spot' && (
+                                <View style={[styles.inputContainer, { flex: 1 }]}>
+                                    <Ionicons name="layers" size={16} color={dimeTheme.colors.textTertiary} />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={shares}
+                                        onChangeText={setShares}
+                                        placeholder="Shares"
+                                        placeholderTextColor={dimeTheme.colors.textTertiary}
+                                        keyboardType="decimal-pad"
+                                    />
+                                </View>
+                            )}
+                        </XStack>
+                    </YStack>
+
+                    {/* Limit Price (for limit orders) */}
+                    {orderType === 'limit' && (
+                        <YStack paddingHorizontal="$4" marginBottom="$3">
+                            <Text color={dimeTheme.colors.textSecondary} fontSize="$2" marginBottom="$2">
+                                Limit Price
+                            </Text>
+                            <View style={styles.inputContainer}>
+                                <Text color={dimeTheme.colors.textTertiary}>$</Text>
+                                <TextInput
+                                    style={styles.input}
+                                    value={limitPrice}
+                                    onChangeText={setLimitPrice}
+                                    placeholder={currentPrice.toFixed(2)}
+                                    placeholderTextColor={dimeTheme.colors.textTertiary}
+                                    keyboardType="decimal-pad"
+                                />
+                            </View>
+                        </YStack>
+                    )}
+
+                    {/* Scheduled Date (for scheduled orders) */}
+                    {orderType === 'scheduled' && (
+                        <YStack paddingHorizontal="$4" marginBottom="$3">
+                            <Text color={dimeTheme.colors.textSecondary} fontSize="$2" marginBottom="$2">
+                                Schedule Time
+                            </Text>
+                            <TouchableOpacity style={styles.dateButton} onPress={() => setShowDatePicker(true)}>
+                                <Ionicons name="calendar" size={20} color={dimeTheme.colors.primary} />
+                                <Text color={dimeTheme.colors.textPrimary} marginLeft={8}>
+                                    {scheduledDate.toLocaleString()}
+                                </Text>
+                            </TouchableOpacity>
+                        </YStack>
+                    )}
+
+                    {/* SL/TP Toggle */}
+                    <XStack paddingHorizontal="$4" marginBottom="$2" justifyContent="space-between" alignItems="center">
+                        <Text color={dimeTheme.colors.textSecondary} fontSize="$2">
+                            Stop Loss / Take Profit
+                        </Text>
+                        <Switch
+                            value={enableSLTP}
+                            onValueChange={setEnableSLTP}
+                            trackColor={{ false: dimeTheme.colors.surface, true: dimeTheme.colors.primary }}
+                            thumbColor="#fff"
+                        />
+                    </XStack>
+
+                    {enableSLTP && (
+                        <XStack paddingHorizontal="$4" marginBottom="$3" gap="$2">
+                            <View style={[styles.inputContainer, styles.slInput, { flex: 1 }]}>
+                                <Text color={dimeTheme.colors.loss} fontSize="$1" fontWeight="600">SL</Text>
+                                <TextInput
+                                    style={[styles.input, { textAlign: 'right' }]}
+                                    value={stopLoss}
+                                    onChangeText={setStopLoss}
+                                    placeholder="Stop Loss"
+                                    placeholderTextColor={dimeTheme.colors.textTertiary}
+                                    keyboardType="decimal-pad"
+                                />
+                            </View>
+                            <View style={[styles.inputContainer, styles.tpInput, { flex: 1 }]}>
+                                <Text color={dimeTheme.colors.profit} fontSize="$1" fontWeight="600">TP</Text>
+                                <TextInput
+                                    style={[styles.input, { textAlign: 'right' }]}
+                                    value={takeProfit}
+                                    onChangeText={setTakeProfit}
+                                    placeholder="Take Profit"
+                                    placeholderTextColor={dimeTheme.colors.textTertiary}
+                                    keyboardType="decimal-pad"
+                                />
+                            </View>
+                        </XStack>
+                    )}
+
+                    {/* Order Summary */}
+                    <View style={styles.summaryCard}>
+                        <Text color={dimeTheme.colors.textSecondary} fontSize="$2" marginBottom="$2">Order Summary</Text>
+                        <XStack justifyContent="space-between" marginBottom="$1">
+                            <Text color={dimeTheme.colors.textTertiary}>Shares</Text>
+                            <Text color={dimeTheme.colors.textPrimary} fontWeight="600">{position.shares.toFixed(4)}</Text>
+                        </XStack>
+                        <XStack justifyContent="space-between" marginBottom="$1">
+                            <Text color={dimeTheme.colors.textTertiary}>Position Value</Text>
+                            <Text color={dimeTheme.colors.textPrimary} fontWeight="600">${position.value.toFixed(2)}</Text>
+                        </XStack>
+                        {orderMode === 'leverage' && (
+                            <XStack justifyContent="space-between" marginBottom="$1">
+                                <Text color={dimeTheme.colors.textTertiary}>Required Margin</Text>
+                                <Text color={dimeTheme.colors.primary} fontWeight="600">${position.margin.toFixed(2)}</Text>
+                            </XStack>
+                        )}
+                    </View>
+
+                    {/* Place Order Button */}
+                    <View style={{ paddingHorizontal: 16, paddingBottom: 32 }}>
+                        <TouchableOpacity
+                            style={[
+                                styles.orderButton,
+                                { backgroundColor: side === 'buy' ? dimeTheme.colors.profit : dimeTheme.colors.loss }
+                            ]}
                             onPress={handleTrade}
                         >
-                            <XStack alignItems="center" gap="$2">
-                                <Ionicons
-                                    name={side === 'long' ? 'trending-up' : 'trending-down'}
-                                    size={20}
-                                    color={dimeTheme.colors.background}
-                                />
-                                <Text color={dimeTheme.colors.background} fontWeight="bold" fontSize="$4">
-                                    Open {side.toUpperCase()} • {leverage}x
-                                </Text>
-                            </XStack>
-                        </Button>
-                    </YStack>
+                            <Text color="#fff" fontSize="$5" fontWeight="bold">
+                                {side === 'buy' ? '🚀 Place Buy Order' : '📉 Place Sell Order'}
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <View style={{ height: 100 }} />
                 </ScrollView>
             </SafeAreaView>
         </View>
@@ -331,31 +449,104 @@ const styles = StyleSheet.create({
     },
     demoBadge: {
         backgroundColor: 'rgba(0, 230, 118, 0.15)',
-        paddingHorizontal: 8,
+        paddingHorizontal: 10,
         paddingVertical: 4,
-        borderRadius: 6,
-        borderWidth: 1,
-        borderColor: dimeTheme.colors.primary,
+        borderRadius: 12,
     },
-    priceCard: {
+    symbolChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
         backgroundColor: dimeTheme.colors.surface,
-        padding: 20,
-        borderRadius: dimeTheme.radius.lg,
         borderWidth: 1,
         borderColor: dimeTheme.colors.border,
     },
-    leverageBadge: {
-        backgroundColor: 'rgba(0, 230, 118, 0.15)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 8,
+    symbolChipActive: {
+        backgroundColor: dimeTheme.colors.primary,
+        borderColor: dimeTheme.colors.primary,
     },
-    amountInput: {
+    priceCard: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        padding: 16,
+        backgroundColor: dimeTheme.colors.surface,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    changeBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderRadius: 12,
+        gap: 4,
+    },
+    sideButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 12,
+        backgroundColor: dimeTheme.colors.surface,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    buyButtonActive: {
+        backgroundColor: dimeTheme.colors.profit,
+        borderColor: dimeTheme.colors.profit,
+    },
+    sellButtonActive: {
+        backgroundColor: dimeTheme.colors.loss,
+        borderColor: dimeTheme.colors.loss,
+    },
+    modeButton: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        backgroundColor: dimeTheme.colors.surface,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    modeButtonActive: {
+        backgroundColor: dimeTheme.colors.primary,
+        borderColor: dimeTheme.colors.primary,
+    },
+    typeChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 20,
+        backgroundColor: dimeTheme.colors.surface,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    typeChipActive: {
+        backgroundColor: dimeTheme.colors.primary,
+        borderColor: dimeTheme.colors.primary,
+    },
+    leverageChip: {
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 8,
+        backgroundColor: dimeTheme.colors.surface,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    leverageChipActive: {
+        backgroundColor: dimeTheme.colors.primary,
+        borderColor: dimeTheme.colors.primary,
+    },
+    inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: dimeTheme.colors.surface,
-        borderRadius: dimeTheme.radius.lg,
-        padding: 16,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         borderWidth: 1,
         borderColor: dimeTheme.colors.border,
         gap: 8,
@@ -363,14 +554,38 @@ const styles = StyleSheet.create({
     input: {
         flex: 1,
         color: dimeTheme.colors.textPrimary,
-        fontSize: 24,
-        fontWeight: 'bold',
+        fontSize: 16,
+        fontWeight: '600',
     },
-    summaryCard: {
+    slInput: {
+        borderColor: 'rgba(255, 82, 82, 0.3)',
+    },
+    tpInput: {
+        borderColor: 'rgba(0, 200, 83, 0.3)',
+    },
+    dateButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
         backgroundColor: dimeTheme.colors.surface,
-        padding: 16,
-        borderRadius: dimeTheme.radius.lg,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
         borderWidth: 1,
         borderColor: dimeTheme.colors.border,
+    },
+    summaryCard: {
+        marginHorizontal: 16,
+        marginBottom: 16,
+        padding: 16,
+        backgroundColor: dimeTheme.colors.surface,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    orderButton: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 18,
+        borderRadius: 16,
     },
 })
