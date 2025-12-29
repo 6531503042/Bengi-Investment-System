@@ -82,5 +82,8 @@ func RunSeeders() {
 		log.Printf("❌ Failed to seed instruments: %v", err)
 	}
 
+	// Seed test portfolio for test@test.com
+	SeedTestPortfolio()
+
 	log.Println("🌱 Seeders completed")
 }
