@@ -106,7 +106,13 @@ export default function SymbolDetailScreen() {
                         size="$3"
                         circular
                         backgroundColor={dimeTheme.colors.surface}
-                        onPress={() => router.back()}
+                        onPress={() => {
+                            if (router.canGoBack()) {
+                                router.back()
+                            } else {
+                                router.replace('/(tabs)/market')
+                            }
+                        }}
                     >
                         <Ionicons name="arrow-back" size={20} color={dimeTheme.colors.textPrimary} />
                     </Button>
