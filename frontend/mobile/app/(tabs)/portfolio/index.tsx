@@ -1,32 +1,33 @@
-import { useState, useEffect } from 'react'
-import { StyleSheet, ScrollView, StatusBar, RefreshControl, TouchableOpacity } from 'react-native'
+import { useState, useEffect, useMemo } from 'react'
+import { StyleSheet, ScrollView, StatusBar, RefreshControl, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { YStack, XStack, Text, View, Button } from 'tamagui'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useDemoStore } from '@/stores/demo'
+import { usePortfolioStore, type PortfolioPosition } from '@/stores/portfolio'
 import { dimeTheme } from '@/constants/theme'
 import { PortfolioCard } from '@/components/portfolio/PortfolioCard'
 import { HoldingItem } from '@/components/portfolio/HoldingItem'
 import { OptionItem } from '@/components/portfolio/OptionItem'
 
-// Mock holdings data
+// Mock data for when no real positions exist (demo mode)
 const MOCK_HOLDINGS = [
-    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://logo.clearbit.com/nvidia.com', quantity: 15, avgCost: 120.50, currentPrice: 134.82 },
-    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://logo.clearbit.com/tesla.com', quantity: 8, avgCost: 245.00, currentPrice: 421.06 },
-    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://logo.clearbit.com/apple.com', quantity: 25, avgCost: 168.00, currentPrice: 254.49 },
-    { symbol: 'AMZN', name: 'Amazon.com Inc.', logoUrl: 'https://logo.clearbit.com/amazon.com', quantity: 12, avgCost: 142.50, currentPrice: 227.05 },
-    { symbol: 'PLTR', name: 'Palantir Technologies', logoUrl: 'https://logo.clearbit.com/palantir.com', quantity: 100, avgCost: 18.50, currentPrice: 75.14 },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com', quantity: 15, avgCost: 120.50, currentPrice: 134.82 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com', quantity: 8, avgCost: 245.00, currentPrice: 421.06 },
+    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com', quantity: 25, avgCost: 168.00, currentPrice: 254.49 },
+    { symbol: 'AMZN', name: 'Amazon.com', logoUrl: 'https://img.logo.dev/amazon.com', quantity: 12, avgCost: 142.50, currentPrice: 227.05 },
+    { symbol: 'PLTR', name: 'Palantir Technologies', logoUrl: 'https://img.logo.dev/palantir.com', quantity: 100, avgCost: 18.50, currentPrice: 75.14 },
 ]
 
-// Mock options data
+// Mock options (options not in backend yet)
 const MOCK_OPTIONS = [
-    { symbol: 'QBTS', name: 'D-Wave Quantum', logoUrl: 'https://logo.clearbit.com/dwavesys.com', type: 'Put' as const, strike: 22.50, expiry: 'Jan 9, 2025', contracts: 1, premium: 0.25, currentPrice: 0.68, delta: -0.24 },
-    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://logo.clearbit.com/tesla.com', type: 'Call' as const, strike: 450.00, expiry: 'Feb 21, 2025', contracts: 2, premium: 12.50, currentPrice: 18.75, delta: 0.45 },
-    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://logo.clearbit.com/nvidia.com', type: 'Call' as const, strike: 150.00, expiry: 'Mar 14, 2025', contracts: 3, premium: 8.20, currentPrice: 5.35, delta: 0.38 },
+    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com', type: 'Call' as const, strike: 450.00, expiry: '2025-02-21', contracts: 2, premium: 12.50, currentPrice: 28.75, delta: 0.45, theta: -0.15, iv: 0.52 },
+    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com', type: 'Call' as const, strike: 150.00, expiry: '2025-03-14', contracts: 3, premium: 8.20, currentPrice: 12.35, delta: 0.38, theta: -0.08, iv: 0.48 },
+    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com', type: 'Put' as const, strike: 240.00, expiry: '2025-01-15', contracts: 5, premium: 3.50, currentPrice: 2.15, delta: -0.32, theta: -0.22, iv: 0.35 },
 ]
 
-// Portfolio tabs - short labels for mobile
+// Portfolio tabs
 const PORTFOLIO_TABS = [
     { id: 'all', name: '← All', color: dimeTheme.colors.textSecondary },
     { id: 'stocks', name: '📈 Stocks', color: '#4CAF50' },
@@ -39,19 +40,42 @@ type SortOption = 'value' | 'pnl' | 'allocation'
 export default function PortfolioScreen() {
     const router = useRouter()
     const { account, fetchDemo } = useDemoStore()
+    const {
+        positions: realPositions,
+        summary,
+        isLoading: portfolioLoading,
+        fetchPortfolios,
+        refreshPositions
+    } = usePortfolioStore()
+
     const [refreshing, setRefreshing] = useState(false)
     const [activeTab, setActiveTab] = useState<FilterType>('all')
     const [sortBy, setSortBy] = useState<SortOption>('value')
 
+    // Fetch data on mount
     useEffect(() => {
         fetchDemo()
+        fetchPortfolios()
     }, [])
 
     const onRefresh = async () => {
         setRefreshing(true)
-        await fetchDemo()
+        await Promise.all([fetchDemo(), refreshPositions()])
         setRefreshing(false)
     }
+
+    // Use real positions if available, fallback to mock
+    const hasRealPositions = realPositions.length > 0
+    const displayHoldings = hasRealPositions
+        ? realPositions.map(p => ({
+            symbol: p.symbol,
+            name: p.name,
+            logoUrl: p.logoUrl,
+            quantity: p.quantity,
+            avgCost: p.avgCost,
+            currentPrice: p.currentPrice,
+        }))
+        : MOCK_HOLDINGS
 
     // Calculate portfolio stats from holdings
     const calculateStats = () => {
@@ -60,7 +84,8 @@ export default function PortfolioScreen() {
         let optionsValue = 0
         let optionsCost = 0
 
-        MOCK_HOLDINGS.forEach(h => {
+        // Use displayHoldings (real data or mock)
+        displayHoldings.forEach(h => {
             stocksValue += h.quantity * h.currentPrice
             stocksCost += h.quantity * h.avgCost
         })
@@ -90,7 +115,7 @@ export default function PortfolioScreen() {
     const stats = calculateStats()
 
     // Calculate allocation for each holding
-    const holdingsWithAllocation = MOCK_HOLDINGS.map(h => ({
+    const holdingsWithAllocation = displayHoldings.map(h => ({
         ...h,
         allocation: (h.quantity * h.currentPrice) / stats.totalValue * 100
     }))
@@ -172,10 +197,13 @@ export default function PortfolioScreen() {
                     {/* Portfolio Card */}
                     <PortfolioCard
                         totalValue={activeTab === 'options' ? stats.optionsValue : activeTab === 'stocks' ? stats.stocksValue : stats.totalValue}
-                        initialValue={stats.initialValue}
+                        cashBalance={account?.balance ?? 10000}
+                        investedValue={stats.stocksValue + stats.optionsValue}
+                        dailyChange={stats.dailyChange * stats.totalValue / 100}
                         dailyChangePercent={stats.dailyChange}
+                        totalPnl={stats.totalPnl}
                         totalPnlPercent={stats.totalPnlPercent}
-                        totalPnlAmount={stats.totalPnl}
+                        onDetailsPress={() => console.log('Details pressed')}
                     />
 
                     {/* Holdings Header */}
@@ -261,6 +289,8 @@ export default function PortfolioScreen() {
                                     premium={option.premium}
                                     currentPrice={option.currentPrice}
                                     delta={option.delta}
+                                    theta={option.theta}
+                                    iv={option.iv}
                                 />
                             ))}
                         </>
