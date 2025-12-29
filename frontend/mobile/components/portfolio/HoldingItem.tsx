@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { StyleSheet, Image, TouchableOpacity } from 'react-native'
+import React from 'react'
+import { StyleSheet, TouchableOpacity } from 'react-native'
 import { Text, XStack, YStack, View } from 'tamagui'
 import { Ionicons } from '@expo/vector-icons'
 import { dimeTheme } from '@/constants/theme'
@@ -7,7 +7,7 @@ import { dimeTheme } from '@/constants/theme'
 interface HoldingItemProps {
     symbol: string
     name: string
-    logoUrl?: string
+    logoUrl?: string // ignored - we use letter icons
     quantity: number
     avgCost: number
     currentPrice: number
@@ -15,34 +15,56 @@ interface HoldingItemProps {
     onPress?: () => void
 }
 
-// Generate consistent color from symbol
-const getSymbolColor = (symbol: string): string => {
-    const colors = ['#E91E63', '#9C27B0', '#673AB7', '#3F51B5', '#2196F3', '#00BCD4', '#009688', '#4CAF50', '#FF9800', '#FF5722']
-    let hash = 0
-    for (let i = 0; i < symbol.length; i++) {
-        hash = symbol.charCodeAt(i) + ((hash << 5) - hash)
-    }
-    return colors[Math.abs(hash) % colors.length]
+// Curated brand colors for popular stocks (Dime-style)
+const BRAND_COLORS: Record<string, { bg: string; text: string }> = {
+    // Tech
+    AAPL: { bg: '#000000', text: '#fff' },
+    MSFT: { bg: '#00A4EF', text: '#fff' },
+    GOOGL: { bg: '#4285F4', text: '#fff' },
+    GOOG: { bg: '#4285F4', text: '#fff' },
+    AMZN: { bg: '#FF9900', text: '#000' },
+    META: { bg: '#0668E1', text: '#fff' },
+    NVDA: { bg: '#76B900', text: '#fff' },
+    TSLA: { bg: '#E82127', text: '#fff' },
+    AMD: { bg: '#ED1C24', text: '#fff' },
+    INTC: { bg: '#0071C5', text: '#fff' },
+    NFLX: { bg: '#E50914', text: '#fff' },
+    PLTR: { bg: '#000000', text: '#fff' },
+
+    // Finance
+    JPM: { bg: '#0A6EBD', text: '#fff' },
+    V: { bg: '#1A1F71', text: '#fff' },
+    MA: { bg: '#EB001B', text: '#fff' },
+    COIN: { bg: '#0052FF', text: '#fff' },
+
+    // Crypto
+    BTC: { bg: '#F7931A', text: '#fff' },
+    ETH: { bg: '#627EEA', text: '#fff' },
+    SOL: { bg: '#9945FF', text: '#fff' },
+
+    // Default
+    DEFAULT: { bg: '#374151', text: '#fff' },
+}
+
+const getSymbolStyle = (symbol: string) => {
+    return BRAND_COLORS[symbol.toUpperCase()] || BRAND_COLORS.DEFAULT
 }
 
 export const HoldingItem: React.FC<HoldingItemProps> = ({
     symbol,
     name,
-    logoUrl,
     quantity,
     avgCost,
     currentPrice,
     allocation,
     onPress,
 }) => {
-    const [imageError, setImageError] = useState(false)
-
     const totalValue = quantity * currentPrice
     const totalCost = quantity * avgCost
     const pnlAmount = totalValue - totalCost
     const pnlPercent = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
     const isProfit = pnlPercent >= 0
-    const symbolColor = getSymbolColor(symbol)
+    const brandStyle = getSymbolStyle(symbol)
 
     const formatValue = (value: number) => {
         if (value >= 1000000) return `${(value / 1000000).toFixed(2)}M`
@@ -58,29 +80,17 @@ export const HoldingItem: React.FC<HoldingItemProps> = ({
         }).format(value)
     }
 
-    const showPlaceholder = !logoUrl || imageError
-
     return (
         <TouchableOpacity
             style={styles.container}
             activeOpacity={0.7}
             onPress={onPress}
         >
-            {/* Logo - Round with colored background */}
-            <View style={styles.logoWrapper}>
-                {!showPlaceholder ? (
-                    <Image
-                        source={{ uri: logoUrl }}
-                        style={styles.logo}
-                        onError={() => setImageError(true)}
-                    />
-                ) : (
-                    <View style={[styles.logoPlaceholder, { backgroundColor: symbolColor }]}>
-                        <Text color="#fff" fontSize={16} fontWeight="bold">
-                            {symbol.charAt(0)}
-                        </Text>
-                    </View>
-                )}
+            {/* Logo - Dime style: colored circle with letter */}
+            <View style={[styles.logoContainer, { backgroundColor: brandStyle.bg }]}>
+                <Text color={brandStyle.text} fontSize={18} fontWeight="bold">
+                    {symbol.charAt(0)}
+                </Text>
             </View>
 
             {/* Symbol + Name + Allocation */}
@@ -90,9 +100,9 @@ export const HoldingItem: React.FC<HoldingItemProps> = ({
                         {symbol}
                     </Text>
                     {/* Allocation Badge */}
-                    <View style={[styles.allocationBadge, { backgroundColor: symbolColor + '25' }]}>
-                        <Ionicons name="pie-chart" size={10} color={symbolColor} />
-                        <Text color={symbolColor} fontSize={10} fontWeight="600" marginLeft={3}>
+                    <View style={styles.allocationBadge}>
+                        <Ionicons name="pie-chart" size={10} color={dimeTheme.colors.primary} />
+                        <Text color={dimeTheme.colors.primary} fontSize={10} fontWeight="600" marginLeft={3}>
                             {allocation.toFixed(1)}%
                         </Text>
                     </View>
@@ -149,30 +159,16 @@ const styles = StyleSheet.create({
     container: {
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: dimeTheme.colors.surface,
         paddingVertical: 14,
         paddingHorizontal: 16,
+        backgroundColor: dimeTheme.colors.surface,
         marginHorizontal: 16,
         marginBottom: 8,
         borderRadius: 14,
         borderWidth: 1,
         borderColor: dimeTheme.colors.border,
     },
-    logoWrapper: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        overflow: 'hidden',
-        backgroundColor: '#1a1a1a',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
-    },
-    logo: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-    },
-    logoPlaceholder: {
+    logoContainer: {
         width: 44,
         height: 44,
         borderRadius: 22,
@@ -185,5 +181,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 6,
         paddingVertical: 3,
         borderRadius: 10,
+        backgroundColor: 'rgba(0, 230, 118, 0.15)',
     },
 })

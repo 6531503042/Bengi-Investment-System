@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { StyleSheet, Image, TouchableOpacity } from 'react-native'
+import React from 'react'
+import { StyleSheet, TouchableOpacity } from 'react-native'
 import { Text, XStack, YStack, View } from 'tamagui'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Ionicons } from '@expo/vector-icons'
@@ -21,13 +21,23 @@ interface OptionItemProps {
     onPress?: () => void
 }
 
-const getSymbolColor = (symbol: string): string => {
-    const colors = ['#4CAF50', '#2196F3', '#9C27B0', '#FF9800', '#E91E63', '#00BCD4', '#FF5722', '#3F51B5']
-    let hash = 0
-    for (let i = 0; i < symbol.length; i++) {
-        hash = symbol.charCodeAt(i) + ((hash << 5) - hash)
-    }
-    return colors[Math.abs(hash) % colors.length]
+// Curated brand colors for popular stocks (Dime-style)
+const BRAND_COLORS: Record<string, { bg: string; text: string }> = {
+    AAPL: { bg: '#000000', text: '#fff' },
+    MSFT: { bg: '#00A4EF', text: '#fff' },
+    GOOGL: { bg: '#4285F4', text: '#fff' },
+    AMZN: { bg: '#FF9900', text: '#000' },
+    META: { bg: '#0668E1', text: '#fff' },
+    NVDA: { bg: '#76B900', text: '#fff' },
+    TSLA: { bg: '#E82127', text: '#fff' },
+    AMD: { bg: '#ED1C24', text: '#fff' },
+    NFLX: { bg: '#E50914', text: '#fff' },
+    PLTR: { bg: '#000000', text: '#fff' },
+    DEFAULT: { bg: '#374151', text: '#fff' },
+}
+
+const getSymbolStyle = (symbol: string) => {
+    return BRAND_COLORS[symbol.toUpperCase()] || BRAND_COLORS.DEFAULT
 }
 
 export const OptionItem: React.FC<OptionItemProps> = ({
@@ -45,8 +55,6 @@ export const OptionItem: React.FC<OptionItemProps> = ({
     iv = 0,
     onPress,
 }) => {
-    const [imageError, setImageError] = useState(false)
-
     const sharesPerContract = 100
     const totalCost = contracts * sharesPerContract * premium
     const totalValue = contracts * sharesPerContract * currentPrice
@@ -56,8 +64,7 @@ export const OptionItem: React.FC<OptionItemProps> = ({
 
     const isCall = type === 'Call'
     const typeColor = isCall ? '#00C853' : '#FF5252'
-    const symbolColor = getSymbolColor(symbol)
-    const showPlaceholder = !logoUrl || imageError
+    const brandStyle = getSymbolStyle(symbol)
 
     // Gradient based on option type
     const gradientColors: readonly [string, string] = isCall
@@ -129,22 +136,12 @@ export const OptionItem: React.FC<OptionItemProps> = ({
 
                 {/* Main Row */}
                 <XStack alignItems="center" gap="$3">
-                    {/* Logo with Option Indicator */}
+                    {/* Logo with Option Indicator - Dime style */}
                     <View style={styles.logoWrapper}>
-                        <View style={styles.logoContainer}>
-                            {!showPlaceholder ? (
-                                <Image
-                                    source={{ uri: logoUrl }}
-                                    style={styles.logo}
-                                    onError={() => setImageError(true)}
-                                />
-                            ) : (
-                                <View style={[styles.logoPlaceholder, { backgroundColor: symbolColor + '25' }]}>
-                                    <Text color={symbolColor} fontSize={18} fontWeight="bold">
-                                        {symbol.charAt(0)}
-                                    </Text>
-                                </View>
-                            )}
+                        <View style={[styles.logoContainer, { backgroundColor: brandStyle.bg }]}>
+                            <Text color={brandStyle.text} fontSize={18} fontWeight="bold">
+                                {symbol.charAt(0)}
+                            </Text>
                         </View>
                         {/* Option type indicator ring */}
                         <View style={[styles.optionRing, { borderColor: typeColor }]} />
@@ -285,10 +282,8 @@ const styles = StyleSheet.create({
         width: 48,
         height: 48,
         borderRadius: 24,
-        overflow: 'hidden',
-        backgroundColor: '#1a1a1a',
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.08)',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     logo: {
         width: 48,
