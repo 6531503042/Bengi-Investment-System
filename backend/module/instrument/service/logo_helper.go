@@ -273,6 +273,7 @@ var cryptoLogos = map[string]string{
 }
 
 // GetLogoURLForSymbol returns the best logo URL for a given symbol and type
+// NOTE: Clearbit is DOWN, using Logo.dev and other alternatives
 func GetLogoURLForSymbol(symbol string, instrumentType string) string {
 	// Handle crypto
 	if instrumentType == "Crypto" {
@@ -285,11 +286,13 @@ func GetLogoURLForSymbol(symbol string, instrumentType string) string {
 	}
 
 	// Handle stocks/ETFs with known domains
+	// Using Logo.dev API (free alternative to Clearbit)
 	if domain, ok := companyDomains[symbol]; ok {
-		return fmt.Sprintf("https://logo.clearbit.com/%s", domain)
+		return fmt.Sprintf("https://img.logo.dev/%s?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ", domain)
 	}
 
-	// Fallback: Try Google favicon (works for almost all companies)
+	// Fallback: Try Logo.dev with symbol.com domain
+	// Or use Google favicon as last resort
 	return fmt.Sprintf("https://www.google.com/s2/favicons?domain=%s.com&sz=128", strings.ToLower(symbol))
 }
 
