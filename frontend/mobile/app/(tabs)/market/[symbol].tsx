@@ -51,6 +51,11 @@ export default function SymbolDetailScreen() {
     const [showOrderModal, setShowOrderModal] = useState(false)
     const [orderSide, setOrderSide] = useState<OrderSide>('BUY')
     const [orderAmount, setOrderAmount] = useState('')
+    const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET')
+    const [limitPrice, setLimitPrice] = useState('')
+    const [enableSLTP, setEnableSLTP] = useState(false)
+    const [stopLoss, setStopLoss] = useState('')
+    const [takeProfit, setTakeProfit] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const instrument = instruments.find(i => i.symbol === symbol)
@@ -407,8 +412,49 @@ export default function SymbolDetailScreen() {
                             <Text color={dimeTheme.colors.primary} fontWeight="600">${balance.toFixed(2)}</Text>
                         </XStack>
 
+                        {/* Order Type Selector */}
+                        <YStack marginBottom="$3">
+                            <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">Order Type</Text>
+                            <XStack gap="$2">
+                                <TouchableOpacity
+                                    style={[styles.orderTypeButton, orderType === 'MARKET' && styles.orderTypeActive]}
+                                    onPress={() => setOrderType('MARKET')}
+                                >
+                                    <Text color={orderType === 'MARKET' ? dimeTheme.colors.primary : dimeTheme.colors.textSecondary} fontWeight="600">
+                                        Market
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.orderTypeButton, orderType === 'LIMIT' && styles.orderTypeActive]}
+                                    onPress={() => setOrderType('LIMIT')}
+                                >
+                                    <Text color={orderType === 'LIMIT' ? dimeTheme.colors.primary : dimeTheme.colors.textSecondary} fontWeight="600">
+                                        Limit
+                                    </Text>
+                                </TouchableOpacity>
+                            </XStack>
+                        </YStack>
+
+                        {/* Limit Price (if LIMIT order) */}
+                        {orderType === 'LIMIT' && (
+                            <YStack marginBottom="$3">
+                                <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">Limit Price</Text>
+                                <View style={styles.amountInputContainer}>
+                                    <Text color={dimeTheme.colors.textSecondary} fontSize="$5">$</Text>
+                                    <TextInput
+                                        style={styles.amountInput}
+                                        value={limitPrice}
+                                        onChangeText={setLimitPrice}
+                                        placeholder={currentPrice.toFixed(2)}
+                                        placeholderTextColor={dimeTheme.colors.textTertiary}
+                                        keyboardType="decimal-pad"
+                                    />
+                                </View>
+                            </YStack>
+                        )}
+
                         {/* Amount Input */}
-                        <YStack marginBottom="$4">
+                        <YStack marginBottom="$3">
                             <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">Amount (USD)</Text>
                             <View style={styles.amountInputContainer}>
                                 <Text color={dimeTheme.colors.textSecondary} fontSize="$5">$</Text>
@@ -424,6 +470,51 @@ export default function SymbolDetailScreen() {
                             </View>
                         </YStack>
 
+                        {/* SL/TP Toggle */}
+                        <XStack justifyContent="space-between" alignItems="center" marginBottom="$3">
+                            <Text color={dimeTheme.colors.textPrimary} fontWeight="600">Stop Loss / Take Profit</Text>
+                            <TouchableOpacity
+                                style={[styles.toggle, enableSLTP && styles.toggleActive]}
+                                onPress={() => setEnableSLTP(!enableSLTP)}
+                            >
+                                <View style={[styles.toggleKnob, enableSLTP && styles.toggleKnobActive]} />
+                            </TouchableOpacity>
+                        </XStack>
+
+                        {/* SL/TP Inputs */}
+                        {enableSLTP && (
+                            <XStack gap="$3" marginBottom="$3">
+                                <YStack flex={1}>
+                                    <Text color={dimeTheme.colors.loss} fontSize="$2" marginBottom="$1">Stop Loss</Text>
+                                    <View style={[styles.slTpInput, { borderColor: dimeTheme.colors.loss + '50' }]}>
+                                        <Text color={dimeTheme.colors.loss}>$</Text>
+                                        <TextInput
+                                            style={styles.slTpInputText}
+                                            value={stopLoss}
+                                            onChangeText={setStopLoss}
+                                            placeholder="0.00"
+                                            placeholderTextColor={dimeTheme.colors.textTertiary}
+                                            keyboardType="decimal-pad"
+                                        />
+                                    </View>
+                                </YStack>
+                                <YStack flex={1}>
+                                    <Text color={dimeTheme.colors.profit} fontSize="$2" marginBottom="$1">Take Profit</Text>
+                                    <View style={[styles.slTpInput, { borderColor: dimeTheme.colors.profit + '50' }]}>
+                                        <Text color={dimeTheme.colors.profit}>$</Text>
+                                        <TextInput
+                                            style={styles.slTpInputText}
+                                            value={takeProfit}
+                                            onChangeText={setTakeProfit}
+                                            placeholder="0.00"
+                                            placeholderTextColor={dimeTheme.colors.textTertiary}
+                                            keyboardType="decimal-pad"
+                                        />
+                                    </View>
+                                </YStack>
+                            </XStack>
+                        )}
+
                         {/* Order Summary */}
                         {orderAmount && parseFloat(orderAmount) > 0 && (
                             <YStack backgroundColor={dimeTheme.colors.surface} padding="$3" borderRadius={12} marginBottom="$4">
@@ -433,9 +524,28 @@ export default function SymbolDetailScreen() {
                                         {(parseFloat(orderAmount) / currentPrice).toFixed(4)}
                                     </Text>
                                 </XStack>
-                                <XStack justifyContent="space-between">
-                                    <Text color={dimeTheme.colors.textSecondary}>Total</Text>
+                                <XStack justifyContent="space-between" marginBottom="$2">
+                                    <Text color={dimeTheme.colors.textSecondary}>Price</Text>
                                     <Text color={dimeTheme.colors.textPrimary} fontWeight="600">
+                                        ${orderType === 'LIMIT' && limitPrice ? parseFloat(limitPrice).toFixed(2) : currentPrice.toFixed(2)}
+                                    </Text>
+                                </XStack>
+                                {enableSLTP && stopLoss && (
+                                    <XStack justifyContent="space-between" marginBottom="$2">
+                                        <Text color={dimeTheme.colors.loss}>Stop Loss</Text>
+                                        <Text color={dimeTheme.colors.loss} fontWeight="600">${stopLoss}</Text>
+                                    </XStack>
+                                )}
+                                {enableSLTP && takeProfit && (
+                                    <XStack justifyContent="space-between" marginBottom="$2">
+                                        <Text color={dimeTheme.colors.profit}>Take Profit</Text>
+                                        <Text color={dimeTheme.colors.profit} fontWeight="600">${takeProfit}</Text>
+                                    </XStack>
+                                )}
+                                <View style={styles.divider} />
+                                <XStack justifyContent="space-between">
+                                    <Text color={dimeTheme.colors.textPrimary} fontWeight="bold">Total</Text>
+                                    <Text color={dimeTheme.colors.textPrimary} fontWeight="bold" fontSize="$5">
                                         ${parseFloat(orderAmount).toFixed(2)}
                                     </Text>
                                 </XStack>
@@ -532,5 +642,63 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: '600',
         marginLeft: 8,
+    },
+    orderTypeButton: {
+        flex: 1,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        backgroundColor: dimeTheme.colors.surface,
+        borderRadius: 8,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    orderTypeActive: {
+        borderColor: dimeTheme.colors.primary,
+        backgroundColor: dimeTheme.colors.primary + '15',
+    },
+    toggle: {
+        width: 50,
+        height: 28,
+        borderRadius: 14,
+        backgroundColor: dimeTheme.colors.surface,
+        padding: 2,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    toggleActive: {
+        backgroundColor: dimeTheme.colors.primary,
+        borderColor: dimeTheme.colors.primary,
+    },
+    toggleKnob: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: dimeTheme.colors.textTertiary,
+    },
+    toggleKnobActive: {
+        backgroundColor: dimeTheme.colors.background,
+        marginLeft: 'auto',
+    },
+    slTpInput: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: dimeTheme.colors.surface,
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderWidth: 1,
+    },
+    slTpInputText: {
+        flex: 1,
+        color: dimeTheme.colors.textPrimary,
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 6,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: dimeTheme.colors.border,
+        marginVertical: 12,
     },
 })

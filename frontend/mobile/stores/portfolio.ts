@@ -68,7 +68,23 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
     fetchPortfolios: async () => {
         set({ isLoading: true, error: null })
         try {
-            const portfolios = await portfolioService.getAll() ?? []
+            let portfolios = await portfolioService.getAll() ?? []
+
+            // Auto-create portfolio if user has none
+            if (portfolios.length === 0) {
+                try {
+                    // We need accountId - try to get from demo store
+                    const { useDemoStore } = await import('./demo')
+                    const demoAccount = useDemoStore.getState().account
+                    if (demoAccount?.accountId) {
+                        const newPortfolio = await portfolioService.create(demoAccount.accountId, 'My Portfolio')
+                        portfolios = [newPortfolio]
+                    }
+                } catch (createError) {
+                    console.log('Could not auto-create portfolio:', createError)
+                }
+            }
+
             set({ portfolios, isLoading: false })
 
             // Auto-select first portfolio if none active
