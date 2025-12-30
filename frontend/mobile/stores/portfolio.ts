@@ -87,12 +87,16 @@ export const usePortfolioStore = create<PortfolioState>((set, get) => ({
 
             set({ portfolios, isLoading: false })
 
-            // Auto-select first portfolio if none active
-            if (portfolios.length > 0 && !get().activePortfolio) {
-                const defaultPortfolio = portfolios.find(p => p.isDefault) || portfolios[0]
-                set({ activePortfolio: defaultPortfolio })
-                // Fetch summary for the active portfolio
-                await get().fetchPortfolioSummary(defaultPortfolio.id)
+            // Get or set active portfolio
+            const currentActive = get().activePortfolio
+            if (portfolios.length > 0) {
+                const targetPortfolio = currentActive
+                    ? portfolios.find(p => p.id === currentActive.id) || portfolios[0]
+                    : portfolios.find(p => p.isDefault) || portfolios[0]
+
+                set({ activePortfolio: targetPortfolio })
+                // ALWAYS fetch summary to get latest positions
+                await get().fetchPortfolioSummary(targetPortfolio.id)
             }
         } catch (error: any) {
             console.error('Failed to fetch portfolios:', error)
