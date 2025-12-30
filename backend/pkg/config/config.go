@@ -8,53 +8,64 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Environment represents the application environment.
+type Environment string
+
+const (
+	EnvDevelopment Environment = "development"
+	EnvProduction  Environment = "production"
+	EnvTesting     Environment = "testing"
+)
+
+// Config holds all application configuration.
+// Loaded from environment variables on startup.
 type Config struct {
-
-	// Server
+	// Server settings
 	Port string
-	Env  string
+	Env  Environment
 
-	// Database
+	// MongoDB connection
 	MongoURI      string
 	MongoDatabase string
 
-	// TwelveData API
+	// Market data APIs
 	TwelveDataAPIKey string
+	FinnhubAPIKey    string
 
-	// Finnhub API
-	FinnhubAPIKey string
-
-	// JWT
+	// JWT authentication
 	JWTSecret         string
 	JWTExpireDuration time.Duration
 
-	// Redis (Optional)
+	// Redis cache (optional)
 	RedisURI string
 
-	// Kafka (Optional)
+	// Kafka messaging (optional)
 	KafkaBrokers string
 	KafkaGroupID string
 }
 
+// AppConfig is the global configuration instance.
 var AppConfig *Config
 
+// LoadConfig reads configuration from environment variables.
+// Falls back to defaults if .env file is not found.
 func LoadConfig() {
 	if err := godotenv.Load(); err != nil {
-		log.Println("No .env file found")
+		log.Println("No .env file found, using environment variables")
 	}
 
 	AppConfig = &Config{
 		Port: getEnv("PORT", "8080"),
-		Env:  getEnv("ENV", "development"),
+		Env:  Environment(getEnv("ENV", string(EnvDevelopment))),
+
+		MongoURI:      getEnv("MONGO_URI", "mongodb://localhost:27017"),
+		MongoDatabase: getEnv("MONGO_DATABASE", "bengi-investment"),
 
 		TwelveDataAPIKey: getEnv("TWELVEDATA_API_KEY", ""),
 		FinnhubAPIKey:    getEnv("FINNHUB_API_KEY", ""),
 
-		MongoURI:      getEnv("MONGO_URI", "mongodb://localhost:27017"),
-		MongoDatabase: getEnv("MONGO_DATABASE", "bengi-investment-system"),
-
-		JWTSecret:         getEnv("JWT_SECRET", "secret"),
-		JWTExpireDuration: parseDuration(getEnv("JWT_EXPIRE_DURATION", "24h")),
+		JWTSecret:         getEnv("JWT_SECRET", "change-this-in-production"),
+		JWTExpireDuration: parseDuration(getEnv("JWT_EXPIRE", "24h")),
 
 		RedisURI: getEnv("REDIS_URI", "redis://localhost:6379"),
 
@@ -63,6 +74,17 @@ func LoadConfig() {
 	}
 }
 
+// IsDevelopment returns true if running in development mode.
+func (c *Config) IsDevelopment() bool {
+	return c.Env == EnvDevelopment
+}
+
+// IsProduction returns true if running in production mode.
+func (c *Config) IsProduction() bool {
+	return c.Env == EnvProduction
+}
+
+// getEnv returns the environment variable value or a default.
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
@@ -70,6 +92,7 @@ func getEnv(key, defaultValue string) string {
 	return defaultValue
 }
 
+// parseDuration parses a duration string, defaults to 24h on error.
 func parseDuration(s string) time.Duration {
 	d, err := time.ParseDuration(s)
 	if err != nil {
