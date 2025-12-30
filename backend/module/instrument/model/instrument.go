@@ -13,11 +13,13 @@ const InstrumentCollection = "instruments"
 type InstrumentType string
 
 const (
-	InstrumentTypeStock  InstrumentType = "Stock"  // Individual company shares
-	InstrumentTypeETF    InstrumentType = "ETF"    // Exchange-traded funds
-	InstrumentTypeCrypto InstrumentType = "Crypto" // Cryptocurrencies
-	InstrumentTypeFuture InstrumentType = "Future" // Futures contracts
-	InstrumentTypeOption InstrumentType = "Option" // Options contracts
+	InstrumentTypeStock     InstrumentType = "Stock"     // Individual company shares
+	InstrumentTypeETF       InstrumentType = "ETF"       // Exchange-traded funds
+	InstrumentTypeCrypto    InstrumentType = "Crypto"    // Cryptocurrencies
+	InstrumentTypeFuture    InstrumentType = "Future"    // Futures contracts
+	InstrumentTypeOption    InstrumentType = "Option"    // Options contracts
+	InstrumentTypeCommodity InstrumentType = "Commodity" // Gold, Silver, Oil etc.
+	InstrumentTypeForex     InstrumentType = "Forex"     // Currency pairs
 )
 
 // InstrumentStatus indicates whether an instrument is available for trading.

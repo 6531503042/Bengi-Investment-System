@@ -11,22 +11,6 @@ import { PortfolioCard } from '@/components/portfolio/PortfolioCard'
 import { HoldingItem } from '@/components/portfolio/HoldingItem'
 import { OptionItem } from '@/components/portfolio/OptionItem'
 
-// Mock data for when no real positions exist (demo mode)
-const MOCK_HOLDINGS = [
-    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 15, avgCost: 120.50, currentPrice: 134.82 },
-    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 8, avgCost: 245.00, currentPrice: 421.06 },
-    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 25, avgCost: 168.00, currentPrice: 254.49 },
-    { symbol: 'AMZN', name: 'Amazon.com', logoUrl: 'https://img.logo.dev/amazon.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 12, avgCost: 142.50, currentPrice: 227.05 },
-    { symbol: 'PLTR', name: 'Palantir Technologies', logoUrl: 'https://img.logo.dev/palantir.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', quantity: 100, avgCost: 18.50, currentPrice: 75.14 },
-]
-
-// Mock options (options not in backend yet)
-const MOCK_OPTIONS = [
-    { symbol: 'TSLA', name: 'Tesla Inc.', logoUrl: 'https://img.logo.dev/tesla.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', type: 'Call' as const, strike: 450.00, expiry: '2025-02-21', contracts: 2, premium: 12.50, currentPrice: 28.75, delta: 0.45, theta: -0.15, iv: 0.52 },
-    { symbol: 'NVDA', name: 'NVIDIA Corporation', logoUrl: 'https://img.logo.dev/nvidia.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', type: 'Call' as const, strike: 150.00, expiry: '2025-03-14', contracts: 3, premium: 8.20, currentPrice: 12.35, delta: 0.38, theta: -0.08, iv: 0.48 },
-    { symbol: 'AAPL', name: 'Apple Inc.', logoUrl: 'https://img.logo.dev/apple.com?token=pk_X-1ZO13GSgeOoUrIuJ6GMQ', type: 'Put' as const, strike: 240.00, expiry: '2025-01-15', contracts: 5, premium: 3.50, currentPrice: 2.15, delta: -0.32, theta: -0.22, iv: 0.35 },
-]
-
 // Portfolio tabs
 const PORTFOLIO_TABS = [
     { id: 'all', name: '← All', color: dimeTheme.colors.textSecondary },
@@ -60,43 +44,33 @@ export default function PortfolioScreen() {
 
     const onRefresh = async () => {
         setRefreshing(true)
-        await Promise.all([fetchDemo(), refreshPositions()])
+        await Promise.all([fetchDemo(), fetchPortfolios()])
         setRefreshing(false)
     }
 
-    // Use real positions if available, fallback to mock
-    const hasRealPositions = realPositions.length > 0
-    const displayHoldings = hasRealPositions
-        ? realPositions.map(p => ({
-            symbol: p.symbol,
-            name: p.name,
-            logoUrl: p.logoUrl,
-            quantity: p.quantity,
-            avgCost: p.avgCost,
-            currentPrice: p.currentPrice,
-        }))
-        : MOCK_HOLDINGS
+    // Always use real positions from API (no mock fallback)
+    const displayHoldings = realPositions.map(p => ({
+        symbol: p.symbol,
+        name: p.name,
+        logoUrl: p.logoUrl,
+        quantity: p.quantity,
+        avgCost: p.avgCost,
+        currentPrice: p.currentPrice,
+    }))
 
     // Calculate portfolio stats from holdings
     const calculateStats = () => {
         let stocksValue = 0
         let stocksCost = 0
-        let optionsValue = 0
-        let optionsCost = 0
 
-        // Use displayHoldings (real data or mock)
+        // Calculate from real positions only
         displayHoldings.forEach(h => {
             stocksValue += h.quantity * h.currentPrice
             stocksCost += h.quantity * h.avgCost
         })
 
-        MOCK_OPTIONS.forEach(o => {
-            optionsValue += o.contracts * 100 * o.currentPrice
-            optionsCost += o.contracts * 100 * o.premium
-        })
-
-        const totalValue = stocksValue + optionsValue
-        const totalCost = stocksCost + optionsCost
+        const totalValue = stocksValue
+        const totalCost = stocksCost
         const totalPnl = totalValue - totalCost
         const totalPnlPercent = totalCost > 0 ? ((totalValue - totalCost) / totalCost) * 100 : 0
 
@@ -106,9 +80,9 @@ export default function PortfolioScreen() {
             totalPnl,
             totalPnlPercent,
             stocksValue,
-            optionsValue,
+            optionsValue: 0, // Options not implemented yet
             initialValue: account?.initialBalance ?? 10000,
-            dailyChange: 2.15, // Mock positive daily change
+            dailyChange: totalPnlPercent,
         }
     }
 
@@ -268,32 +242,13 @@ export default function PortfolioScreen() {
                         </>
                     )}
 
-                    {/* Options Section */}
-                    {showOptions && MOCK_OPTIONS.length > 0 && (
-                        <>
-                            <XStack paddingHorizontal="$4" paddingTop="$3" paddingBottom="$2">
-                                <Text color={dimeTheme.colors.textTertiary} fontSize={11}>
-                                    {MOCK_OPTIONS.length} Options
-                                </Text>
-                            </XStack>
-                            {MOCK_OPTIONS.map((option, index) => (
-                                <OptionItem
-                                    key={`${option.symbol}-${option.type}-${index}`}
-                                    symbol={option.symbol}
-                                    name={option.name}
-                                    logoUrl={option.logoUrl}
-                                    type={option.type}
-                                    strike={option.strike}
-                                    expiry={option.expiry}
-                                    contracts={option.contracts}
-                                    premium={option.premium}
-                                    currentPrice={option.currentPrice}
-                                    delta={option.delta}
-                                    theta={option.theta}
-                                    iv={option.iv}
-                                />
-                            ))}
-                        </>
+                    {/* Options Section - Coming Soon */}
+                    {showOptions && (
+                        <YStack padding="$4" alignItems="center">
+                            <Text color={dimeTheme.colors.textTertiary} fontSize={14}>
+                                Options trading coming soon 🎯
+                            </Text>
+                        </YStack>
                     )}
 
                     {/* Bottom padding */}

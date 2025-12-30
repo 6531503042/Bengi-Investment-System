@@ -48,11 +48,11 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <TabBarIcon name="trending-up" color={color} />,
         }}
       />
+      {/* Trade tab hidden - trading is now done via stock detail page */}
       <Tabs.Screen
         name="trade/index"
         options={{
-          title: 'Trade',
-          tabBarIcon: ({ color }) => <TabBarIcon name="swap-horizontal" color={color} />,
+          href: null, // Hidden from tabs
         }}
       />
       <Tabs.Screen

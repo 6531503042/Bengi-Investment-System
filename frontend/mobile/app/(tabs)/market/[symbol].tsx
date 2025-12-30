@@ -58,6 +58,11 @@ export default function SymbolDetailScreen() {
     const [takeProfit, setTakeProfit] = useState('')
     const [isSubmitting, setIsSubmitting] = useState(false)
 
+    // Enhanced order options
+    const [amountUnit, setAmountUnit] = useState<'USD' | 'SHARES'>('USD')
+    const [leverage, setLeverage] = useState<number>(1)
+    const LEVERAGE_OPTIONS = [1, 10, 50, 100]
+
     const instrument = instruments.find(i => i.symbol === symbol)
 
     // Ensure portfolio is loaded on mount
@@ -142,11 +147,13 @@ export default function SymbolDetailScreen() {
             return
         }
 
-        const shares = amount / currentPrice
-        const totalCost = amount
+        // Calculate shares based on unit type
+        const shares = amountUnit === 'USD' ? amount / currentPrice : amount
+        const totalCost = shares * currentPrice
+        const marginRequired = totalCost / leverage // Leverage reduces margin needed
 
-        if (orderSide === 'BUY' && totalCost > balance) {
-            Alert.alert('Insufficient Balance', `You only have $${balance.toFixed(2)} available`)
+        if (orderSide === 'BUY' && marginRequired > balance) {
+            Alert.alert('Insufficient Balance', `You need $${marginRequired.toFixed(2)} margin (${leverage}x leverage)`)
             return
         }
 
@@ -169,9 +176,10 @@ export default function SymbolDetailScreen() {
             await fetchPortfolios() // Refresh portfolio to see new position
 
             setShowOrderModal(false)
+            const leverageText = leverage > 1 ? ` (${leverage}x leverage)` : ''
             Alert.alert(
                 'Order Placed! 🎉',
-                `${orderSide} order for ${shares.toFixed(4)} ${symbol} placed!\n\nTotal: $${totalCost.toFixed(2)}`,
+                `${orderSide} order for ${shares.toFixed(4)} ${symbol}${leverageText}\n\nTotal: $${totalCost.toFixed(2)}`,
                 [{ text: 'OK' }]
             )
         } catch (error: any) {
@@ -464,11 +472,56 @@ export default function SymbolDetailScreen() {
                             </YStack>
                         )}
 
+                        {/* Unit Toggle (USD / Shares) */}
+                        <YStack marginBottom="$3">
+                            <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">Amount in</Text>
+                            <XStack gap="$2">
+                                <TouchableOpacity
+                                    style={[styles.orderTypeButton, amountUnit === 'USD' && styles.orderTypeActive]}
+                                    onPress={() => setAmountUnit('USD')}
+                                >
+                                    <Text color={amountUnit === 'USD' ? dimeTheme.colors.primary : dimeTheme.colors.textSecondary} fontWeight="600">
+                                        💵 USD
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.orderTypeButton, amountUnit === 'SHARES' && styles.orderTypeActive]}
+                                    onPress={() => setAmountUnit('SHARES')}
+                                >
+                                    <Text color={amountUnit === 'SHARES' ? dimeTheme.colors.primary : dimeTheme.colors.textSecondary} fontWeight="600">
+                                        📦 Shares
+                                    </Text>
+                                </TouchableOpacity>
+                            </XStack>
+                        </YStack>
+
+                        {/* Leverage Selector */}
+                        <YStack marginBottom="$3">
+                            <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">Leverage</Text>
+                            <XStack gap="$2">
+                                {LEVERAGE_OPTIONS.map((lev) => (
+                                    <TouchableOpacity
+                                        key={lev}
+                                        style={[styles.leverageButton, leverage === lev && styles.leverageActive]}
+                                        onPress={() => setLeverage(lev)}
+                                    >
+                                        <Text color={leverage === lev ? dimeTheme.colors.background : dimeTheme.colors.textSecondary} fontWeight="600" fontSize={12}>
+                                            {lev}x
+                                        </Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </XStack>
+                        </YStack>
+
                         {/* Amount Input */}
                         <YStack marginBottom="$3">
-                            <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">Amount (USD)</Text>
+                            <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">
+                                {amountUnit === 'USD' ? 'Amount (USD)' : 'Shares'}
+                            </Text>
                             <View style={styles.amountInputContainer}>
-                                <Text color={dimeTheme.colors.textSecondary} fontSize="$5">$</Text>
+                                <Text color={dimeTheme.colors.textSecondary} fontSize="$5">
+                                    {amountUnit === 'USD' ? '$' : '#'}
+                                </Text>
                                 <TextInput
                                     style={styles.amountInput}
                                     value={orderAmount}
@@ -711,5 +764,19 @@ const styles = StyleSheet.create({
         height: 1,
         backgroundColor: dimeTheme.colors.border,
         marginVertical: 12,
+    },
+    leverageButton: {
+        flex: 1,
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        backgroundColor: dimeTheme.colors.surface,
+        borderRadius: 8,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    leverageActive: {
+        borderColor: dimeTheme.colors.primary,
+        backgroundColor: dimeTheme.colors.primary,
     },
 })

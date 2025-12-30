@@ -192,6 +192,19 @@ var PopularInstruments = []model.Instrument{
 	{Symbol: "BCH/USD", Name: "Bitcoin Cash", Type: model.InstrumentTypeCrypto, Exchange: "Crypto", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://cryptologos.cc/logos/bitcoin-cash-bch-logo.png"},
 	{Symbol: "SHIB/USD", Name: "Shiba Inu", Type: model.InstrumentTypeCrypto, Exchange: "Crypto", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://cryptologos.cc/logos/shiba-inu-shib-logo.png"},
 	{Symbol: "PEPE/USD", Name: "Pepe", Type: model.InstrumentTypeCrypto, Exchange: "Crypto", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://cryptologos.cc/logos/pepe-pepe-logo.png"},
+
+	// ============ COMMODITIES ============
+	{Symbol: "XAU/USD", Name: "Gold", Type: model.InstrumentTypeCommodity, Exchange: "Forex", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/gold-bars.png", Description: "Spot Gold"},
+	{Symbol: "XAG/USD", Name: "Silver", Type: model.InstrumentTypeCommodity, Exchange: "Forex", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/silver-bars.png", Description: "Spot Silver"},
+	{Symbol: "WTI/USD", Name: "Crude Oil WTI", Type: model.InstrumentTypeCommodity, Exchange: "NYMEX", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/oil-industry.png", Description: "WTI Crude Oil"},
+
+	// ============ FOREX PAIRS ============
+	{Symbol: "EUR/USD", Name: "Euro / US Dollar", Type: model.InstrumentTypeForex, Exchange: "Forex", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/euro.png", Description: "Euro vs US Dollar"},
+	{Symbol: "GBP/USD", Name: "British Pound / US Dollar", Type: model.InstrumentTypeForex, Exchange: "Forex", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/uk.png", Description: "British Pound vs US Dollar"},
+	{Symbol: "USD/JPY", Name: "US Dollar / Japanese Yen", Type: model.InstrumentTypeForex, Exchange: "Forex", Currency: "JPY", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/japan.png", Description: "US Dollar vs Japanese Yen"},
+	{Symbol: "AUD/USD", Name: "Australian Dollar / US Dollar", Type: model.InstrumentTypeForex, Exchange: "Forex", Currency: "USD", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/australia.png", Description: "Australian Dollar vs US Dollar"},
+	{Symbol: "USD/CAD", Name: "US Dollar / Canadian Dollar", Type: model.InstrumentTypeForex, Exchange: "Forex", Currency: "CAD", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/canada.png", Description: "US Dollar vs Canadian Dollar"},
+	{Symbol: "USD/CHF", Name: "US Dollar / Swiss Franc", Type: model.InstrumentTypeForex, Exchange: "Forex", Currency: "CHF", Status: model.InstrumentStatusActive, LogoURL: "https://img.icons8.com/color/96/switzerland.png", Description: "US Dollar vs Swiss Franc"},
 }
 
 // SeedInstruments seeds popular instruments if they don't exist
