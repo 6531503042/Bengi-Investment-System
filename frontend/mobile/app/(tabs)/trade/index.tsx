@@ -96,7 +96,7 @@ export default function TradeScreen() {
             Alert.alert('Insufficient Balance', `You only have $${balance.toFixed(2)} available`)
             return
         }
-        if (!demoAccount?.id) {
+        if (!demoAccount?.accountId) {
             Alert.alert('No Account', 'Please set up an account first')
             return
         }
@@ -127,7 +127,7 @@ export default function TradeScreen() {
                         setIsSubmitting(true)
                         try {
                             const orderInput: CreateOrderInput = {
-                                accountId: demoAccount.id,
+                                accountId: demoAccount.accountId,
                                 portfolioId: activePortfolio.id,
                                 symbol: symbol,
                                 side: side.toUpperCase() as 'BUY' | 'SELL',

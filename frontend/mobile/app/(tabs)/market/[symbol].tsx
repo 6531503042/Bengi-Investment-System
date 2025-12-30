@@ -121,7 +121,7 @@ export default function SymbolDetailScreen() {
             Alert.alert('Invalid Amount', 'Please enter a valid amount')
             return
         }
-        if (!demoAccount?.id) {
+        if (!demoAccount?.accountId) {
             Alert.alert('No Account', 'Please set up an account first')
             return
         }
@@ -141,7 +141,7 @@ export default function SymbolDetailScreen() {
         setIsSubmitting(true)
         try {
             const orderInput: CreateOrderInput = {
-                accountId: demoAccount.id,
+                accountId: demoAccount.accountId,
                 portfolioId: activePortfolio.id,
                 symbol: symbol,
                 side: orderSide,
