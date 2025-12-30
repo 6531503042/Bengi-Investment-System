@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react'
-import { StyleSheet, ScrollView, StatusBar, TextInput, Alert, TouchableOpacity, Switch } from 'react-native'
+import { StyleSheet, ScrollView, StatusBar, TextInput, Alert, TouchableOpacity, Switch, ActivityIndicator } from 'react-native'
 import { YStack, XStack, Text, View, Button } from 'tamagui'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { useMarketStore } from '@/stores/market'
 import { useDemoStore } from '@/stores/demo'
+import { usePortfolioStore } from '@/stores/portfolio'
+import { orderService } from '@/services/api'
 import { dimeTheme } from '@/constants/theme'
 import { Ionicons } from '@expo/vector-icons'
-import DateTimePicker from '@react-native-community/datetimepicker'
+import type { CreateOrderInput } from '@/types/trade'
 
 type OrderSide = 'buy' | 'sell'
 type OrderMode = 'spot' | 'leverage' | 'options'
@@ -35,6 +37,8 @@ export default function TradeScreen() {
     const params = useLocalSearchParams<{ symbol?: string; side?: string }>()
     const { quotes } = useMarketStore()
     const { account: demoAccount, fetchDemo } = useDemoStore()
+    const { activePortfolio } = usePortfolioStore()
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
     const [symbol, setSymbol] = useState(params.symbol ?? 'AAPL')
     const [side, setSide] = useState<OrderSide>((params.side === 'short' ? 'sell' : 'buy') as OrderSide)
@@ -82,13 +86,22 @@ export default function TradeScreen() {
 
     const position = getPositionDetails()
 
-    const handleTrade = () => {
+    const handleTrade = async () => {
+        // Validation
         if (position.margin <= 0) {
             Alert.alert('Invalid Amount', 'Please enter a valid trade amount')
             return
         }
         if (position.margin > balance) {
             Alert.alert('Insufficient Balance', `You only have $${balance.toFixed(2)} available`)
+            return
+        }
+        if (!demoAccount?.id) {
+            Alert.alert('No Account', 'Please set up an account first')
+            return
+        }
+        if (!activePortfolio?.id) {
+            Alert.alert('No Portfolio', 'Please create a portfolio first')
             return
         }
 
@@ -100,25 +113,51 @@ export default function TradeScreen() {
             ? `\n\nStop Loss: ${stopLoss ? `$${stopLoss}` : 'Not set'}\nTake Profit: ${takeProfit ? `$${takeProfit}` : 'Not set'}`
             : ''
 
-        const scheduleDetails = orderType === 'scheduled'
-            ? `\n\nScheduled: ${scheduledDate.toLocaleString()}`
-            : ''
-
         Alert.alert(
             `Confirm ${side.toUpperCase()} Order`,
             `${orderMode.toUpperCase()} ${orderType.toUpperCase()}\n\n` +
             `Symbol: ${symbol}\n` +
             `Price: $${currentPrice.toFixed(2)}\n` +
-            orderDetails + slTpDetails + scheduleDetails,
+            orderDetails + slTpDetails,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
                     text: 'Place Order',
-                    onPress: () => {
-                        Alert.alert('Order Placed! 🎉',
-                            `Your ${side} order for ${symbol} has been placed successfully!`,
-                            [{ text: 'OK' }]
-                        )
+                    onPress: async () => {
+                        setIsSubmitting(true)
+                        try {
+                            const orderInput: CreateOrderInput = {
+                                accountId: demoAccount.id,
+                                portfolioId: activePortfolio.id,
+                                symbol: symbol,
+                                side: side.toUpperCase() as 'BUY' | 'SELL',
+                                type: orderType === 'limit' ? 'LIMIT' : 'MARKET',
+                                quantity: position.shares,
+                                price: orderType === 'limit' ? Number(limitPrice) || currentPrice : undefined,
+                            }
+
+                            const order = await orderService.create(orderInput)
+
+                            // Refresh demo account balance
+                            await fetchDemo()
+
+                            Alert.alert(
+                                'Order Placed! 🎉',
+                                `Your ${side.toUpperCase()} order for ${position.shares.toFixed(4)} ${symbol} has been placed!\n\nOrder ID: ${order.id.slice(0, 8)}...`,
+                                [{
+                                    text: 'OK', onPress: () => {
+                                        // Clear form
+                                        setAmount('')
+                                        setShares('')
+                                    }
+                                }]
+                            )
+                        } catch (error: any) {
+                            const message = error?.response?.data?.message || error?.message || 'Failed to place order'
+                            Alert.alert('Order Failed', message)
+                        } finally {
+                            setIsSubmitting(false)
+                        }
                     }
                 },
             ]

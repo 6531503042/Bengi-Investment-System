@@ -191,19 +191,24 @@ export const accountService = {
 
 // Order API
 export const orderService = {
-    getAll: async () => {
-        const { data } = await api.get<{ orders: Order[] }>('/orders')
-        return data.orders
+    getAll: async (): Promise<Order[]> => {
+        const { data: response } = await api.get<ApiResponse<{ orders: Order[] }>>('/orders')
+        return response?.data?.orders ?? []
     },
 
-    create: async (input: CreateOrderInput) => {
-        const { data } = await api.post<Order>('/orders', input)
-        return data
+    create: async (input: CreateOrderInput): Promise<Order> => {
+        const { data: response } = await api.post<ApiResponse<Order>>('/orders', input)
+        return response.data
     },
 
-    cancel: async (id: string) => {
-        const { data } = await api.post<Order>(`/orders/${id}/cancel`)
-        return data
+    getById: async (id: string): Promise<Order> => {
+        const { data: response } = await api.get<ApiResponse<Order>>(`/orders/${id}`)
+        return response.data
+    },
+
+    cancel: async (id: string): Promise<Order> => {
+        const { data: response } = await api.post<ApiResponse<Order>>(`/orders/${id}/cancel`)
+        return response.data
     },
 }
 
