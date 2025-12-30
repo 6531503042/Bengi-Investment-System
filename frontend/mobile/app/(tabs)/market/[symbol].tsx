@@ -34,7 +34,7 @@ export default function SymbolDetailScreen() {
     const router = useRouter()
     const { instruments } = useMarketStore()
     const { account: demoAccount, fetchDemo } = useDemoStore()
-    const { activePortfolio } = usePortfolioStore()
+    const { activePortfolio, fetchPortfolios } = usePortfolioStore()
 
     // Decode URL-encoded symbol
     const symbol = rawSymbol ? decodeURIComponent(rawSymbol) : ''
@@ -59,6 +59,13 @@ export default function SymbolDetailScreen() {
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const instrument = instruments.find(i => i.symbol === symbol)
+
+    // Ensure portfolio is loaded on mount
+    useEffect(() => {
+        if (!activePortfolio) {
+            fetchPortfolios()
+        }
+    }, [activePortfolio, fetchPortfolios])
 
     // Fetch quote once on mount (with error handling)
     useEffect(() => {
