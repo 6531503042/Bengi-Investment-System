@@ -157,12 +157,16 @@ export default function SymbolDetailScreen() {
                 portfolioId: activePortfolio.id,
                 symbol: symbol,
                 side: orderSide,
-                type: 'MARKET',
+                type: orderType,
                 quantity: shares,
+                price: currentPrice, // Send actual price for execution
             }
 
             const order = await orderService.create(orderInput)
-            await fetchDemo() // Refresh balance
+
+            // Refresh balance and positions
+            await fetchDemo()
+            await fetchPortfolios() // Refresh portfolio to see new position
 
             setShowOrderModal(false)
             Alert.alert(
