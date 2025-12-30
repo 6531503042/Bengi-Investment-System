@@ -1,15 +1,18 @@
 import { useState, useEffect } from 'react'
-import { StyleSheet, ScrollView, StatusBar, Dimensions } from 'react-native'
+import { StyleSheet, ScrollView, StatusBar, Dimensions, TextInput, Alert, Modal, TouchableOpacity, ActivityIndicator } from 'react-native'
 import { YStack, XStack, Text, View, Button, Spinner } from 'tamagui'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons'
 import { useMarketStore } from '@/stores/market'
-import { instrumentService } from '@/services/api'
+import { useDemoStore } from '@/stores/demo'
+import { usePortfolioStore } from '@/stores/portfolio'
+import { instrumentService, orderService } from '@/services/api'
 import { dimeTheme } from '@/constants/theme'
 import { PriceChip } from '@/components/common/PriceChip'
 import { TradingViewChart } from '@/components/chart/TradingViewChart'
 import type { CandleData, Instrument, Quote } from '@/types/market'
+import type { CreateOrderInput, OrderSide } from '@/types/trade'
 
 const { width: screenWidth } = Dimensions.get('window')
 
@@ -30,10 +33,11 @@ export default function SymbolDetailScreen() {
     const { symbol: rawSymbol } = useLocalSearchParams<{ symbol: string }>()
     const router = useRouter()
     const { instruments } = useMarketStore()
+    const { account: demoAccount, fetchDemo } = useDemoStore()
+    const { activePortfolio } = usePortfolioStore()
 
-    // Decode URL-encoded symbol and create chart symbol for Yahoo Finance
+    // Decode URL-encoded symbol
     const symbol = rawSymbol ? decodeURIComponent(rawSymbol) : ''
-    // Convert crypto symbols for Yahoo Finance (BTC/USD -> BTC-USD)
     const chartSymbol = symbol.replace('/', '-')
 
     const [selectedPeriod, setSelectedPeriod] = useState<TimePeriod>('1M')
@@ -42,6 +46,12 @@ export default function SymbolDetailScreen() {
     const [isLoadingChart, setIsLoadingChart] = useState(true)
     const [isLoadingQuote, setIsLoadingQuote] = useState(true)
     const [chartType, setChartType] = useState<'candlestick' | 'line' | 'area'>('area')
+
+    // Order modal state
+    const [showOrderModal, setShowOrderModal] = useState(false)
+    const [orderSide, setOrderSide] = useState<OrderSide>('BUY')
+    const [orderAmount, setOrderAmount] = useState('')
+    const [isSubmitting, setIsSubmitting] = useState(false)
 
     const instrument = instruments.find(i => i.symbol === symbol)
 
@@ -94,6 +104,66 @@ export default function SymbolDetailScreen() {
         if (vol >= 1e6) return (vol / 1e6).toFixed(1) + 'M'
         if (vol >= 1e3) return (vol / 1e3).toFixed(1) + 'K'
         return vol.toString()
+    }
+
+    const currentPrice = quote?.price ?? 0
+    const balance = demoAccount?.balance ?? 0
+
+    const openOrderModal = (side: OrderSide) => {
+        setOrderSide(side)
+        setOrderAmount('')
+        setShowOrderModal(true)
+    }
+
+    const handlePlaceOrder = async () => {
+        const amount = parseFloat(orderAmount)
+        if (!amount || amount <= 0) {
+            Alert.alert('Invalid Amount', 'Please enter a valid amount')
+            return
+        }
+        if (!demoAccount?.id) {
+            Alert.alert('No Account', 'Please set up an account first')
+            return
+        }
+        if (!activePortfolio?.id) {
+            Alert.alert('No Portfolio', 'Please create a portfolio first')
+            return
+        }
+
+        const shares = amount / currentPrice
+        const totalCost = amount
+
+        if (orderSide === 'BUY' && totalCost > balance) {
+            Alert.alert('Insufficient Balance', `You only have $${balance.toFixed(2)} available`)
+            return
+        }
+
+        setIsSubmitting(true)
+        try {
+            const orderInput: CreateOrderInput = {
+                accountId: demoAccount.id,
+                portfolioId: activePortfolio.id,
+                symbol: symbol,
+                side: orderSide,
+                type: 'MARKET',
+                quantity: shares,
+            }
+
+            const order = await orderService.create(orderInput)
+            await fetchDemo() // Refresh balance
+
+            setShowOrderModal(false)
+            Alert.alert(
+                'Order Placed! 🎉',
+                `${orderSide} order for ${shares.toFixed(4)} ${symbol} placed!\n\nTotal: $${totalCost.toFixed(2)}`,
+                [{ text: 'OK' }]
+            )
+        } catch (error: any) {
+            const message = error?.response?.data?.message || error?.message || 'Failed to place order'
+            Alert.alert('Order Failed', message)
+        } finally {
+            setIsSubmitting(false)
+        }
     }
 
     return (
@@ -277,12 +347,12 @@ export default function SymbolDetailScreen() {
                             size="$5"
                             backgroundColor={dimeTheme.colors.profit}
                             pressStyle={{ opacity: 0.9 }}
-                            onPress={() => router.push({ pathname: '/(tabs)/trade', params: { symbol, side: 'long' } })}
+                            onPress={() => openOrderModal('BUY')}
                         >
                             <XStack alignItems="center" gap="$2">
-                                <Ionicons name="trending-up" size={18} color={dimeTheme.colors.background} />
+                                <Ionicons name="arrow-up-circle" size={20} color={dimeTheme.colors.background} />
                                 <Text color={dimeTheme.colors.background} fontWeight="bold" fontSize="$4">
-                                    Long
+                                    BUY
                                 </Text>
                             </XStack>
                         </Button>
@@ -291,18 +361,106 @@ export default function SymbolDetailScreen() {
                             size="$5"
                             backgroundColor={dimeTheme.colors.loss}
                             pressStyle={{ opacity: 0.9 }}
-                            onPress={() => router.push({ pathname: '/(tabs)/trade', params: { symbol, side: 'short' } })}
+                            onPress={() => openOrderModal('SELL')}
                         >
                             <XStack alignItems="center" gap="$2">
-                                <Ionicons name="trending-down" size={18} color={dimeTheme.colors.background} />
+                                <Ionicons name="arrow-down-circle" size={20} color={dimeTheme.colors.background} />
                                 <Text color={dimeTheme.colors.background} fontWeight="bold" fontSize="$4">
-                                    Short
+                                    SELL
                                 </Text>
                             </XStack>
                         </Button>
                     </XStack>
                 </ScrollView>
             </SafeAreaView>
+
+            {/* Order Modal */}
+            <Modal
+                visible={showOrderModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowOrderModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContent}>
+                        {/* Modal Header */}
+                        <XStack justifyContent="space-between" alignItems="center" marginBottom="$4">
+                            <Text color={dimeTheme.colors.textPrimary} fontSize="$6" fontWeight="bold">
+                                {orderSide} {symbol}
+                            </Text>
+                            <TouchableOpacity onPress={() => setShowOrderModal(false)}>
+                                <Ionicons name="close" size={24} color={dimeTheme.colors.textSecondary} />
+                            </TouchableOpacity>
+                        </XStack>
+
+                        {/* Price Info */}
+                        <YStack marginBottom="$4">
+                            <Text color={dimeTheme.colors.textSecondary} fontSize="$3">Current Price</Text>
+                            <Text color={dimeTheme.colors.textPrimary} fontSize="$7" fontWeight="bold">
+                                ${currentPrice.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+                            </Text>
+                        </YStack>
+
+                        {/* Balance */}
+                        <XStack justifyContent="space-between" marginBottom="$3">
+                            <Text color={dimeTheme.colors.textSecondary}>Available Balance</Text>
+                            <Text color={dimeTheme.colors.primary} fontWeight="600">${balance.toFixed(2)}</Text>
+                        </XStack>
+
+                        {/* Amount Input */}
+                        <YStack marginBottom="$4">
+                            <Text color={dimeTheme.colors.textSecondary} marginBottom="$2">Amount (USD)</Text>
+                            <View style={styles.amountInputContainer}>
+                                <Text color={dimeTheme.colors.textSecondary} fontSize="$5">$</Text>
+                                <TextInput
+                                    style={styles.amountInput}
+                                    value={orderAmount}
+                                    onChangeText={setOrderAmount}
+                                    placeholder="0.00"
+                                    placeholderTextColor={dimeTheme.colors.textTertiary}
+                                    keyboardType="decimal-pad"
+                                    autoFocus
+                                />
+                            </View>
+                        </YStack>
+
+                        {/* Order Summary */}
+                        {orderAmount && parseFloat(orderAmount) > 0 && (
+                            <YStack backgroundColor={dimeTheme.colors.surface} padding="$3" borderRadius={12} marginBottom="$4">
+                                <XStack justifyContent="space-between" marginBottom="$2">
+                                    <Text color={dimeTheme.colors.textSecondary}>Shares</Text>
+                                    <Text color={dimeTheme.colors.textPrimary} fontWeight="600">
+                                        {(parseFloat(orderAmount) / currentPrice).toFixed(4)}
+                                    </Text>
+                                </XStack>
+                                <XStack justifyContent="space-between">
+                                    <Text color={dimeTheme.colors.textSecondary}>Total</Text>
+                                    <Text color={dimeTheme.colors.textPrimary} fontWeight="600">
+                                        ${parseFloat(orderAmount).toFixed(2)}
+                                    </Text>
+                                </XStack>
+                            </YStack>
+                        )}
+
+                        {/* Place Order Button */}
+                        <Button
+                            size="$5"
+                            backgroundColor={orderSide === 'BUY' ? dimeTheme.colors.profit : dimeTheme.colors.loss}
+                            pressStyle={{ opacity: 0.9 }}
+                            onPress={handlePlaceOrder}
+                            disabled={isSubmitting}
+                        >
+                            {isSubmitting ? (
+                                <ActivityIndicator color={dimeTheme.colors.background} />
+                            ) : (
+                                <Text color={dimeTheme.colors.background} fontWeight="bold" fontSize="$5">
+                                    {orderSide} {symbol}
+                                </Text>
+                            )}
+                        </Button>
+                    </View>
+                </View>
+            </Modal>
         </View>
     )
 }
@@ -345,5 +503,34 @@ const styles = StyleSheet.create({
     statItem: {
         width: '50%',
         paddingVertical: 8,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: dimeTheme.colors.background,
+        borderTopLeftRadius: 24,
+        borderTopRightRadius: 24,
+        padding: 24,
+        paddingBottom: 40,
+    },
+    amountInputContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: dimeTheme.colors.surface,
+        borderRadius: 12,
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderWidth: 1,
+        borderColor: dimeTheme.colors.border,
+    },
+    amountInput: {
+        flex: 1,
+        color: dimeTheme.colors.textPrimary,
+        fontSize: 24,
+        fontWeight: '600',
+        marginLeft: 8,
     },
 })
