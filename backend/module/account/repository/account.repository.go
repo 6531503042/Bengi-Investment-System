@@ -77,6 +77,15 @@ func (r *AccountRepository) UpdateBalance(ctx context.Context, accountID primiti
 	})
 	return err
 }
+
+// UpdateBalanceDelta atomically adds/subtracts from balance (use negative for deduct)
+func (r *AccountRepository) UpdateBalanceDelta(ctx context.Context, accountID primitive.ObjectID, delta float64) error {
+	_, err := r.accountCollection.UpdateByID(ctx, accountID, bson.M{
+		"$inc": bson.M{"balance": delta},
+		"$set": bson.M{"updatedAt": time.Now()},
+	})
+	return err
+}
 func (r *AccountRepository) UpdateStatus(ctx context.Context, accountID primitive.ObjectID, status model.AccountStatus) error {
 	_, err := r.accountCollection.UpdateByID(ctx, accountID, bson.M{
 		"$set": bson.M{
